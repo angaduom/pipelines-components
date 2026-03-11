@@ -248,6 +248,7 @@ $RECYCLE.BIN/
 *.env
 !.env.example
 !.env.sample
+!.env.template
 .envrc
 
 # Secrets and credentials
