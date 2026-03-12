@@ -6,7 +6,7 @@ High-level tests that run the **AutoGluon tabular training pipeline** (AutoML) o
 
 - RHOAI cluster with Data Science Pipelines enabled and a pipeline server running.
 - S3-compatible storage (e.g. MinIO or AWS S3) for AutoML pipeline test data and artifacts.
-- Optional: `kubectl` access (or in-cluster config) to create a test project (namespace) and S3 connection secret.
+- Optional: `kubectl/oc` access (or in-cluster config) to create a test project (namespace) and S3 connection secret.
 
 ## Environment variables
 
@@ -14,10 +14,10 @@ Set these to enable the AutoML integration tests; otherwise they are skipped. Yo
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `RHOAI_URL` | Yes | Base URL of the pipeline API (e.g. `https://api.example.com`). |
+| `RHOAI_URL` | Yes | Base URL of the OCP cluster (e.g. `https://api.example.com`). |
 | `RHOAI_KFP_URL` | Yes | KFP server URL where the client connects (e.g. `https://ds-pipeline-dspa-<project>.apps...`). |
-| `RHOAI_TOKEN` | Yes | Auth token for the pipeline API (e.g. from RHOAI dashboard or service account). |
-| `RHOAI_PROJECT_NAME` | No | Project/namespace name for the test run (default: `kfp-integration-test`). |
+| `RHOAI_TOKEN` | Yes | Auth token for the OCP cluster (e.g. from RHOAI dashboard or service account). |
+| `RHOAI_PROJECT_NAME` | No | RHOAI Project/namespace name for the test run (default: `kfp-integration-test`). |
 | `AWS_S3_ENDPOINT` | Yes | S3-compatible endpoint URL. |
 | `AWS_ACCESS_KEY_ID` | Yes | S3 access key. |
 | `AWS_SECRET_ACCESS_KEY` | Yes | S3 secret key. |
