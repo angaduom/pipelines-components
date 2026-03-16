@@ -12,7 +12,7 @@ if str(_tests_dir) not in sys.path:
 
 import pytest
 
-from integration_config import RHOAI_INTEGRATION_CONFIG, get_rhoai_config
+from integration_config import RHOAI_INTEGRATION_CONFIG, get_rhoai_config, get_dspa_config
 
 # .env is loaded by integration_config at import time.
 # ---------------------------------------------------------------------------
@@ -38,6 +38,63 @@ def integration_available(rhoai_integration_config):
     return rhoai_integration_config is not None
 
 
+def _build_temp_kubeconfig(server_url, token, namespace="default"):
+    """Build a minimal kubeconfig dict and write it to a temp file; return the file path."""
+    server_url = (server_url or "").rstrip("/")
+    config = {
+        "apiVersion": "v1",
+        "kind": "Config",
+        "clusters": [
+            {
+                "name": "rhoai",
+                "cluster": {
+                    "server": server_url,
+                    "insecure-skip-tls-verify": True,
+                },
+            }
+        ],
+        "users": [{"name": "rhoai", "user": {"token": token or ""}}],
+        "contexts": [
+            {
+                "name": "rhoai",
+                "context": {"cluster": "rhoai", "user": "rhoai", "namespace": namespace or "default"},
+            }
+        ],
+        "current-context": "rhoai",
+    }
+    import yaml
+
+    fd, path = tempfile.mkstemp(suffix=".kubeconfig", prefix="automl-test-")
+    os.close(fd)
+    with open(path, "w") as f:
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+    return path
+
+
+@pytest.fixture(scope="session")
+def temp_kubeconfig_path(rhoai_integration_config):
+    """
+    Create a temporary kubeconfig from RHOAI_URL and RHOAI_TOKEN (.env) so the Kubernetes
+    client does not use the default ~/.kube/config. Session-scoped; file is removed after tests.
+    Yields the path to the temp file, or None when integration config is not set.
+    """
+    if rhoai_integration_config is None:
+        yield None
+        return
+    path = _build_temp_kubeconfig(
+        server_url=rhoai_integration_config["rhoai_url"],
+        token=rhoai_integration_config["rhoai_token"],
+        namespace=rhoai_integration_config["rhoai_project"],
+    )
+    try:
+        yield path
+    finally:
+        try:
+            Path(path).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 @pytest.fixture(scope="session")
 def s3_client(rhoai_integration_config):
     """Session-scoped S3 client for test data upload (and optional artifact checks)."""
@@ -58,13 +115,12 @@ def s3_client(rhoai_integration_config):
 
 
 @pytest.fixture(scope="session")
-def rhoai_project(rhoai_integration_config, s3_client):
+def rhoai_project(rhoai_integration_config, s3_client, temp_kubeconfig_path):
     """
     Ensure RHOAI test project exists: create Kubernetes namespace and S3 connection secret.
 
-    Requires kubeconfig or in-cluster config so that the test runner can create
-    resources. If kubernetes client is not available or creation fails, the
-    fixture skips.
+    Uses temp kubeconfig from RHOAI_URL and RHOAI_TOKEN when temp_kubeconfig_path is set;
+    otherwise falls back to default kubeconfig or in-cluster config.
     """
     if rhoai_integration_config is None:
         yield None
@@ -77,7 +133,10 @@ def rhoai_project(rhoai_integration_config, s3_client):
     except ImportError:
         pytest.skip("kubernetes client not installed; pip install kubernetes")
     try:
-        config.load_kube_config()
+        if temp_kubeconfig_path:
+            config.load_kube_config(config_file=temp_kubeconfig_path)
+        else:
+            config.load_kube_config()
     except Exception:
         try:
             config.load_incluster_config()
@@ -106,6 +165,283 @@ def rhoai_project(rhoai_integration_config, s3_client):
         if e.status != 409:
             v1.replace_namespaced_secret(secret_name, project_name, secret)
     yield project_name
+
+
+def _create_datascience_pipelines_application(
+    namespace,
+    dspa_config,
+    resource_name="automl-test-dspa",
+    kubeconfig_path=None,
+    object_storage_host=None,
+    object_storage_region=None,
+    object_storage_secret_name=None,
+    object_storage_bucket=None,
+):
+    """
+    Create a DataSciencePipelinesApplication CR in the given namespace using CustomObjectsApi.
+
+    The Data Science Pipelines Operator (DSPO) / Open Data Hub will reconcile the CR and
+    deploy the pipeline server. Requires the DSPA CRD and operator to be installed.
+    When kubeconfig_path is set, uses that file instead of default kubeconfig.
+    When object_storage_secret_name and object_storage_bucket are set, configures
+    spec.objectStorage.external; otherwise uses spec.objectStorage.internal (operator-managed MinIO).
+
+    Returns (created_cr, error_message). On success: (created, None). On failure: (None, str).
+    """
+    from kubernetes import client, config
+    from kubernetes.client.rest import ApiException
+
+    try:
+        if kubeconfig_path:
+            config.load_kube_config(config_file=kubeconfig_path)
+        else:
+            config.load_kube_config()
+    except Exception as e:
+        try:
+            config.load_incluster_config()
+        except Exception as e2:
+            return (
+                None,
+                f"Could not load kubeconfig or in-cluster config: {e!r}; in-cluster: {e2!r}",
+            )
+
+    # CRD requires spec.objectStorage: either internal (operator MinIO) or external (existing S3).
+    if object_storage_secret_name and object_storage_bucket:
+        object_storage = {
+            "externalStorage": {
+                "basePath": "",
+                "bucket": object_storage_bucket,
+                "host": object_storage_host.lstrip("https://"),
+                "port": "",
+                "region": object_storage_region,
+                "s3CredentialsSecret": {
+                    "accessKey": "AWS_ACCESS_KEY_ID",
+                    "secretKey": "AWS_SECRET_ACCESS_KEY",
+                    "secretName": object_storage_secret_name
+                },
+                "scheme": "https"
+            }
+        }
+    else:
+        object_storage = {"internal": {}}
+
+    body = {
+        "apiVersion": f"{dspa_config['api_group']}/{dspa_config['api_version']}",
+        "kind": "DataSciencePipelinesApplication",
+        "metadata": {
+            "name": "dspa",
+            "namespace": namespace,
+        },
+        "spec": {
+            "objectStorage": object_storage,
+        },
+    }
+    try:
+        co = client.CustomObjectsApi()
+        created = co.create_namespaced_custom_object(
+            group=dspa_config["api_group"],
+            version=dspa_config["api_version"],
+            namespace=namespace,
+            plural=dspa_config["plural"],
+            body=body,
+        )
+        return (created, None)
+    except ApiException as e:
+        detail = getattr(e, "body", None)
+        if isinstance(detail, str) and detail:
+            try:
+                import json
+
+                detail = json.loads(detail)
+            except Exception:
+                pass
+        msg_parts = [
+            f"DSPA creation failed: HTTP {getattr(e, 'status', '?')}",
+            f"reason={getattr(e, 'reason', '')}",
+        ]
+        if detail and isinstance(detail, dict):
+            for key in ("message", "reason", "details"):
+                if key in detail and detail[key]:
+                    msg_parts.append(f"{key}={detail[key]}")
+        else:
+            msg_parts.append(f"body={detail!r}")
+        return (None, "; ".join(msg_parts))
+    except Exception as e:
+        return (None, f"DSPA creation failed: {type(e).__name__}: {e!r}")
+
+
+def _wait_for_dspa_ready(
+    namespace,
+    dspa_name,
+    dspa_config,
+    kubeconfig_path=None,
+    timeout_seconds=600,
+):
+    """
+    Poll the DSPA CR until status.conditions has type=Ready and status=True, or timeout.
+
+    Returns True when ready, False on timeout. Uses the same kubeconfig as creation.
+    """
+    import time
+
+    from kubernetes import client, config
+    from kubernetes.client.rest import ApiException
+
+    try:
+        if kubeconfig_path:
+            config.load_kube_config(config_file=kubeconfig_path)
+        else:
+            config.load_kube_config()
+    except Exception:
+        try:
+            config.load_incluster_config()
+        except Exception:
+            return False
+    co = client.CustomObjectsApi()
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        try:
+            cr = co.get_namespaced_custom_object(
+                group=dspa_config["api_group"],
+                version=dspa_config["api_version"],
+                namespace=namespace,
+                plural=dspa_config["plural"],
+                name=dspa_name,
+            )
+        except ApiException:
+            time.sleep(10)
+            continue
+        status = cr.get("status") or {}
+        conditions = status.get("conditions") or []
+        for c in conditions:
+            if (c.get("type") or "") == "Ready" and (c.get("status") or "") == "True":
+                return True
+        time.sleep(10)
+    return False
+
+
+# OpenShift Route API: group, version, plural for listing routes
+_ROUTE_GROUP = "route.openshift.io"
+_ROUTE_VERSION = "v1"
+_ROUTE_PLURAL = "routes"
+
+
+def _get_dspa_route_url(namespace, route_name_prefix="ds-pipeline", timeout_seconds=300, kubeconfig_path=None):
+    """
+    Resolve the pipeline API URL from an OpenShift Route in the given namespace.
+
+    Lists Route custom resources (route.openshift.io/v1/routes) and returns
+    https://<host> for the first route whose metadata.name starts with route_name_prefix.
+    If no route matches, returns the first route in the namespace. Retries until
+    timeout_seconds or until a route is found.
+    When kubeconfig_path is set, uses that file instead of default kubeconfig.
+
+    Returns the URL string (with trailing slash) or None if no route is found in time.
+    """
+    import time
+
+    from kubernetes import client, config
+    from kubernetes.client.rest import ApiException
+
+    try:
+        if kubeconfig_path:
+            config.load_kube_config(config_file=kubeconfig_path)
+        else:
+            config.load_kube_config()
+    except Exception:
+        try:
+            config.load_incluster_config()
+        except Exception:
+            return None
+    co = client.CustomObjectsApi()
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        try:
+            resp = co.list_namespaced_custom_object(
+                group=_ROUTE_GROUP,
+                version=_ROUTE_VERSION,
+                namespace=namespace,
+                plural=_ROUTE_PLURAL,
+            )
+        except ApiException:
+            time.sleep(5)
+            continue
+        items = resp.get("items") or []
+        route = None
+        for r in items:
+            name = (r.get("metadata") or {}).get("name") or ""
+            if name.startswith(route_name_prefix):
+                route = r
+                break
+        if not route and items:
+            route = items[0]
+        if route:
+            host = (route.get("spec") or {}).get("host")
+            if not host and (route.get("status") or {}).get("ingress"):
+                host = route["status"]["ingress"][0].get("host")
+            if host:
+                return f"https://{host}".rstrip("/") + "/"
+        time.sleep(5)
+    return None
+
+
+@pytest.fixture(scope="session")
+def datascience_pipelines_application(rhoai_integration_config, rhoai_project, temp_kubeconfig_path):
+    """
+    Optionally create a DataSciencePipelinesApplication CR in the test project namespace.
+
+    Controlled by env: set RHOAI_CREATE_DSPA=true (or 1) to create the CR via Kubernetes
+    CustomObjectsApi. Uses temp kubeconfig from .env (RHOAI_URL, RHOAI_TOKEN) when set.
+    If creation is attempted and fails, logs the error and fails the test.
+    """
+    if rhoai_integration_config is None or rhoai_project is None:
+        yield None
+        return
+    dspa_config = get_dspa_config()
+    if not dspa_config or not dspa_config.get("create"):
+        yield None
+        return
+    try:
+        from kubernetes import client, config  # noqa: F401
+    except ImportError:
+        pytest.skip("kubernetes client not installed; pip install kubernetes")
+    created, error_message = _create_datascience_pipelines_application(
+        rhoai_project,
+        dspa_config,
+        kubeconfig_path=temp_kubeconfig_path,
+        object_storage_secret_name=rhoai_integration_config.get("s3_secret_name"),
+        object_storage_host=rhoai_integration_config.get("s3_endpoint"),
+        object_storage_region=rhoai_integration_config.get("s3_region"),
+        object_storage_bucket=rhoai_integration_config.get("s3_bucket_artifacts")
+        or rhoai_integration_config.get("s3_bucket_data"),
+    )
+    if created is None and error_message:
+        import logging
+
+        logging.getLogger(__name__).error("DSPA creation failed: %s", error_message)
+        pytest.fail(f"DataSciencePipelinesApplication creation failed: {error_message}")
+
+    # Wait for DSPA to become Ready, then add buffer before using the API.
+    if created is not None:
+        import time
+
+        dspa_name = (created.get("metadata") or {}).get("name", "dspa")
+        namespace = (created.get("metadata") or {}).get("namespace", rhoai_project)
+        ready_timeout = dspa_config.get("ready_wait_timeout", 600)
+        buffer_seconds = dspa_config.get("ready_buffer_seconds", 30)
+        if not _wait_for_dspa_ready(
+            namespace, dspa_name, dspa_config, kubeconfig_path=temp_kubeconfig_path, timeout_seconds=ready_timeout
+        ):
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "DSPA %s/%s did not become Ready within %s s; continuing anyway",
+                namespace,
+                dspa_name,
+                ready_timeout,
+            )
+        time.sleep(buffer_seconds)
+    yield created
 
 
 @pytest.fixture(scope="session")
@@ -170,15 +506,34 @@ def test_data_uploaded(rhoai_integration_config, s3_client):
 
 
 @pytest.fixture(scope="session")
-def kfp_client(rhoai_integration_config):
+def kfp_client(rhoai_integration_config, datascience_pipelines_application, temp_kubeconfig_path):
     """Session-scoped KFP client pointing to RHOAI pipeline API."""
     if rhoai_integration_config is None:
         return None
     import kfp
 
-    host = rhoai_integration_config["rhoai_kfp_url"]
+    # If we created a DSPA, resolve the route URL from OpenShift Route; else use env.
+    host = None
+    if datascience_pipelines_application is not None:
+        dspa_config = get_dspa_config()
+        if dspa_config:
+            namespace = (datascience_pipelines_application.get("metadata") or {}).get("namespace")
+            if namespace:
+                host = _get_dspa_route_url(
+                    namespace,
+                    route_name_prefix=dspa_config.get("route_name_prefix", "ds-pipeline"),
+                    timeout_seconds=dspa_config.get("route_wait_timeout", 300),
+                    kubeconfig_path=temp_kubeconfig_path,
+                )
+    if host is None:
+        host = rhoai_integration_config["rhoai_kfp_url"]
     if not host.endswith("/"):
         host = host + "/"
+    if not host or not host.strip():
+        pytest.skip(
+            "KFP API URL not set: when RHOAI_CREATE_DSPA=true the route could not be resolved in time; "
+            "otherwise set RHOAI_KFP_URL in .env"
+        )
 
     client = kfp.Client(
         host=host,
