@@ -13,9 +13,7 @@ class TestDocumentsRagOptimizationPipelineUnit:
 
     def test_pipeline_required_parameters(self):
         """Pipeline declares expected required parameters."""
-        inputs = getattr(
-            documents_rag_optimization_pipeline, "_component_inputs", set()
-        )
+        inputs = getattr(documents_rag_optimization_pipeline, "_component_inputs", set())
         assert "test_data_secret_name" in inputs
         assert "test_data_bucket_name" in inputs
         assert "test_data_key" in inputs

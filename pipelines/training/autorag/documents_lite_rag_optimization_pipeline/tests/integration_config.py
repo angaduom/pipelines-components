@@ -71,8 +71,7 @@ def get_docrag_lite_integration_config():
     emb_token = os.environ.get(EMBEDDING_MODEL_TOKEN_ENV)
 
     if not all(
-        [kfp_url, token, t_secret, t_bucket, t_key, i_secret, i_bucket, i_key,
-         chat_url, chat_token, emb_url, emb_token]
+        [kfp_url, token, t_secret, t_bucket, t_key, i_secret, i_bucket, i_key, chat_url, chat_token, emb_url, emb_token]
     ):
         return None
 

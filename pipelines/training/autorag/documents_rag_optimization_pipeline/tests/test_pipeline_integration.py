@@ -14,7 +14,6 @@ import secrets
 from datetime import datetime, timezone
 
 import pytest
-
 from integration_config import DOCRAG_INTEGRATION_CONFIG
 
 # Pipeline display name in KFP (from pipeline decorator)
@@ -54,8 +53,7 @@ def _run_succeeded(detail):
 
 
 def _find_artifacts_in_s3(s3_client, bucket, prefix):
-    """
-    List object keys under prefix; return lists of keys for leaderboard HTML,
+    """List object keys under prefix; return lists of keys for leaderboard HTML,
     rag_patterns (directories/artifacts), and .ipynb notebooks.
     """
     html_keys = []
@@ -93,10 +91,7 @@ def _pipeline_arguments_from_config(config):
 @pytest.mark.functional
 @pytest.mark.skipif(
     DOCRAG_INTEGRATION_CONFIG is None,
-    reason=(
-        "RHOAI integration env not set (set RHOAI_KFP_URL, RHOAI_TOKEN, pipeline params, "
-        "see .env.example)"
-    ),
+    reason=("RHOAI integration env not set (set RHOAI_KFP_URL, RHOAI_TOKEN, pipeline params, see .env.example)"),
 )
 class TestDocumentsRagOptimizationPipelineIntegration:
     """Integration tests running the pipeline on RHOAI and validating outcomes."""
@@ -122,16 +117,13 @@ class TestDocumentsRagOptimizationPipelineIntegration:
             pipeline_run_timeout,
         )
         assert _run_succeeded(detail), (
-            f"Pipeline run {run_id} did not succeed; "
-            f"state={getattr(getattr(detail, 'run', detail), 'state', detail)}"
+            f"Pipeline run {run_id} did not succeed; state={getattr(getattr(detail, 'run', detail), 'state', detail)}"
         )
 
         if s3_client and config.get("s3_bucket_artifacts"):
             bucket = config["s3_bucket_artifacts"]
             prefix = f"{PIPELINE_DISPLAY_NAME}/{run_id}"
-            html_keys, ipynb_keys, pattern_keys = _find_artifacts_in_s3(
-                s3_client, bucket, prefix
-            )
+            html_keys, ipynb_keys, pattern_keys = _find_artifacts_in_s3(s3_client, bucket, prefix)
             assert len(html_keys) >= 1 or len(ipynb_keys) >= 1 or len(pattern_keys) >= 1, (
                 f"Expected at least one artifact (leaderboard, .ipynb, or rag_patterns) "
                 f"under {prefix}; found html={len(html_keys)}, ipynb={len(ipynb_keys)}, "
