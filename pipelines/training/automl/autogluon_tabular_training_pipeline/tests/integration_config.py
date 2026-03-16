@@ -62,7 +62,7 @@ def get_rhoai_config():
         return None
     return {
         "rhoai_url": url.rstrip("/"),
-        "rhoai_kfp_url": kfp_url.rstrip("/"),
+        "rhoai_kfp_url": kfp_url.rstrip("/") if not None else None,
         "rhoai_token": token,
         "rhoai_project": project or "kfp-integration-test",
         "s3_endpoint": endpoint,
