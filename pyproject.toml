@@ -6,9 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "kfp-components"
 version = "1.11.0"
 description = "A collection of reusable components and pipelines for Kubeflow Pipelines"
-authors = [
-    {name = "Kubeflow Community"}
-]
+authors = [{ name = "Kubeflow Community" }]
 license = "Apache-2.0"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,10 +35,8 @@ test = [
     "setuptools"
 ]
 # Local development (extends test with additional tools)
-dev = [
-    "kfp-components[lint]",
-    "kfp-components[test]",
-]
+dev = ["kfp-components[lint]", "kfp-components[test]"]
+
 
 [project.urls]
 Homepage = "https://www.kubeflow.org/docs/components/pipelines/"
@@ -109,6 +105,7 @@ packages = [
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.yml", "*.json"]
 "kfp_components.components.training.automl.autogluon_models_full_refit" = ["notebook_templates/*.ipynb"]
+"kfp_components.components.training.autorag.rag_templates_optimization" = ["notebook_templates/*.ipynb"]
 
 [tool.ruff]
 line-length = 120
@@ -128,9 +125,9 @@ exclude = [
 # Enable pycodestyle (E, W), pyflakes (F), isort (I), pydocstyle (D)
 select = ["E", "W", "F", "I", "D"]
 ignore = [
-    "D100",  # Missing docstring in public module
-    "D104",  # Missing docstring in public package
-    "D415",  # First line should end with punctuation (not needed for simple module names)
+    "D100", # Missing docstring in public module
+    "D104", # Missing docstring in public package
+    "D415", # First line should end with punctuation (not needed for simple module names)
 ]
 
 
@@ -159,5 +156,16 @@ testpaths = ["scripts"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "functional: marks test as functional/e2e (requires RHOAI cluster and .env config)",
+]
 # Don't search these directories
-norecursedirs = [".git", ".venv", "build", "dist", "__pycache__", "components", "pipelines"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    "build",
+    "dist",
+    "__pycache__",
+    "components",
+    "pipelines",
+]

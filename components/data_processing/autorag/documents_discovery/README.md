@@ -6,7 +6,8 @@
 
 Documents discovery component.
 
-Lists available documents from S3, performs sampling if applied and writes a JSON manifest (documents_descriptor.json) with metadata. Does not download document contents.
+Lists available documents from S3, performs sampling if applied and writes a JSON manifest (documents_descriptor.json)
+with metadata. Does not download document contents.
 
 ## Inputs 📥
 
