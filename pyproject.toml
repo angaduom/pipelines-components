@@ -97,6 +97,8 @@ packages = [
     "kfp_components.pipelines.training.finetuning.osft_minimal",
     "kfp_components.pipelines.training.finetuning.sft",
     "kfp_components.pipelines.training.finetuning.sft_minimal",
+    "kfp_components.pipelines.training.automl",
+    "kfp_components.pipelines.training.automl.autogluon_tabular_training_pipeline",
 ]
 
 [tool.setuptools.package-dir]
@@ -106,6 +108,7 @@ packages = [
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.yml", "*.json"]
+"kfp_components.components.training.automl.autogluon_models_full_refit" = ["notebook_templates/*.ipynb"]
 
 [tool.ruff]
 line-length = 120
