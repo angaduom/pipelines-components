@@ -69,19 +69,19 @@ uv sync --extra test_automl
 Run only AutoML integration tests (from repo root):
 
 ```bash
-pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/test_pipeline_integration.py -m integration -v
+uv run pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/test_pipeline_integration.py -m integration -v
 ```
 
 Run all AutoML pipeline tests (unit + integration; integration tests skip if env not set):
 
 ```bash
-pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/ -v
+uv run pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/ -v
 ```
 
 Exclude AutoML integration tests:
 
 ```bash
-pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/ -m "not integration" -v
+uv run pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/ -m "not integration" -v
 ```
 
 To avoid the "Unknown pytest.mark.integration" warning, register the mark in `pyproject.toml` under `[tool.pytest.ini_options]`:
