@@ -391,6 +391,7 @@ def _create_datascience_pipelines_application(
             "objectStorage": object_storage,
         },
     }
+    dspa_name = body["metadata"]["name"]
     try:
         co = client.CustomObjectsApi()
         created = co.create_namespaced_custom_object(
@@ -402,6 +403,19 @@ def _create_datascience_pipelines_application(
         )
         return (created, None)
     except ApiException as e:
+        if e.status == 409:
+            # DSPA already exists; fetch and reuse it.
+            try:
+                existing = co.get_namespaced_custom_object(
+                    group=dspa_config["api_group"],
+                    version=dspa_config["api_version"],
+                    namespace=namespace,
+                    plural=dspa_config["plural"],
+                    name=dspa_name,
+                )
+                return (existing, None)
+            except ApiException as get_e:
+                return (None, f"DSPA already exists but get failed: {get_e!r}")
         detail = getattr(e, "body", None)
         if isinstance(detail, str) and detail:
             try:
