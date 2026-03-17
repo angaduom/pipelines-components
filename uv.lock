@@ -457,6 +457,7 @@ version = "1.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "kfp" },
+    { name = "kfp-kubernetes" },
 ]
 
 [package.optional-dependencies]
@@ -464,7 +465,6 @@ dev = [
     { name = "docker" },
     { name = "docstring-parser" },
     { name = "jinja2" },
-    { name = "kfp-kubernetes" },
     { name = "packaging" },
     { name = "pip" },
     { name = "pytest" },
@@ -484,12 +484,27 @@ test = [
     { name = "docker" },
     { name = "docstring-parser" },
     { name = "jinja2" },
+    { name = "packaging" },
+    { name = "pip" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+    { name = "pyyaml" },
+    { name = "semver" },
+    { name = "setuptools" },
+]
+test-automl = [
+    { name = "boto3" },
+    { name = "docker" },
+    { name = "docstring-parser" },
+    { name = "jinja2" },
     { name = "kfp-kubernetes" },
     { name = "packaging" },
     { name = "pip" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "semver" },
     { name = "setuptools" },
