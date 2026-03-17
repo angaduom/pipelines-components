@@ -41,7 +41,7 @@ This component is part of a two-stage training pipeline where models are first b
   - training
   - automl
   - autogluon-models-selection
-- **Last Verified**: 2026-03-06 11:05:29+00:00
+- **Last Verified**: 2026-03-12 19:53:22+00:00
 - **Owners**:
   - Approvers:
     - LukaszCmielowski
