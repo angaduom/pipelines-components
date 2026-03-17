@@ -78,6 +78,7 @@ packages = [
     "kfp_components.pipelines",
     "kfp_components.pipelines.training",
     "kfp_components.pipelines.training.autorag",
+    "kfp_components.pipelines.training.autorag.documents_lite_rag_optimization_pipeline",
     "kfp_components.pipelines.training.autorag.documents_rag_optimization_pipeline",
     "kfp_components.pipelines.evaluation",
     "kfp_components.pipelines.data_processing",
