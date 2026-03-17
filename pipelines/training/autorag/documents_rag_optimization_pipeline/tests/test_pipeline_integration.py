@@ -14,7 +14,14 @@ import secrets
 from datetime import datetime, timezone
 
 import pytest
-from integration_config import DOCRAG_INTEGRATION_CONFIG
+
+
+def _skip_if_no_rag_integration_config():
+    """Return True if integration config is not set (skip test)."""
+    from integration_config import DOCRAG_INTEGRATION_CONFIG
+
+    return DOCRAG_INTEGRATION_CONFIG is None
+
 
 # Pipeline display name in KFP (from pipeline decorator)
 PIPELINE_DISPLAY_NAME = "documents-rag-optimization-pipeline"
@@ -93,7 +100,7 @@ def _pipeline_arguments_from_config(config):
 
 @pytest.mark.functional
 @pytest.mark.skipif(
-    DOCRAG_INTEGRATION_CONFIG is None,
+    _skip_if_no_rag_integration_config(),
     reason=("RHOAI integration env not set (set RHOAI_KFP_URL, RHOAI_TOKEN, pipeline params, see .env.example)"),
 )
 class TestDocumentsRagOptimizationPipelineIntegration:
