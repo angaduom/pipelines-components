@@ -15,8 +15,8 @@ Set these to enable the AutoML integration tests; otherwise they are skipped. Yo
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `RHOAI_URL` | Yes | Base URL of the OCP cluster (e.g. `https://api.example.com`). |
-| `RHOAI_KFP_URL` | Yes | KFP server URL where the client connects (e.g. `https://ds-pipeline-dspa-<project>.apps...`). |
-| `RHOAI_TOKEN` | Yes | Auth token for the OCP cluster (e.g. from RHOAI dashboard or service account). |
+| `RHOAI_KFP_URL` | No | KFP server URL where the client connects (e.g. `https://ds-pipeline-dspa-<project>.apps...`). |
+| `RHOAI_TOKEN` | Yes | API token; use a **service account token** for Jenkins/CI (long-lived, no oc or kubeconfig). |
 | `RHOAI_PROJECT_NAME` | No | RHOAI Project/namespace name for the test run (default: `kfp-integration-test`). |
 | `AWS_S3_ENDPOINT` | Yes | S3-compatible endpoint URL. |
 | `AWS_ACCESS_KEY_ID` | Yes | S3 access key. |
@@ -29,10 +29,98 @@ Set these to enable the AutoML integration tests; otherwise they are skipped. Yo
 
 All required variables must be set for the AutoML integration tests to run; if any is missing, `RHOAI_INTEGRATION_CONFIG` is `None` and the tests are skipped with a reason pointing to `.env.template`.
 
+### Authentication (service account token for Jenkins / CI)
+
+Set **`RHOAI_TOKEN`** to an OpenShift API token. Follow [Scenario 1](#scenario-1-automatic-project-creation) (automatic project creation) or [Scenario 2](#scenario-2-no-automatic-project-creation-existing-project) (existing project) below to create the ServiceAccount and obtain a token; in Jenkins, store the token as a secret and bind it to `RHOAI_TOKEN`. Service account tokens are long-lived; no `oc` or kubeconfig is needed at test time.
+
+### Creating a service account for the tests
+
+Choose **one** of the two scenarios below. Both produce a token for `RHOAI_TOKEN`; no `oc` or kubeconfig is needed when running the tests.
+
+---
+
+#### Scenario 1: Automatic project creation
+
+The test creates the project via OpenShift ProjectRequest (same as `oc new-project`). Set `RHOAI_PROJECT_NAME` to the project name to create; it can be a new name each run (e.g. in CI). The ServiceAccount can live in any namespace (e.g. `default`).
+
+**1. Create the ServiceAccount** (in any namespace):
+
+```bash
+export SA_NAMESPACE=default
+export SA_NAME=kfp-integration-tests
+oc create serviceaccount "${SA_NAME}" -n "${SA_NAMESPACE}"
+```
+
+**2. Grant self-provisioner** so the SA can create projects:
+
+```bash
+oc adm policy add-cluster-role-to-user self-provisioner -z "${SA_NAME}" -n "${SA_NAMESPACE}"
+```
+
+**3. (Optional) If your cluster does not grant the ProjectRequest creator admin** in the new project, the test will create a RoleBinding to grant the SA admin. For that, the SA needs permission to create RoleBindings. A cluster admin runs once:
+
+```bash
+oc create clusterrole kfp-integration-tests-rolebinding-creator \
+  --verb=create,get,update,patch \
+  --resource=rolebindings.rbac.authorization.k8s.io
+
+oc adm policy add-cluster-role-to-user kfp-integration-tests-rolebinding-creator \
+  -z "${SA_NAME}" -n "${SA_NAMESPACE}"
+```
+
+**4. Create a token** and configure:
+
+```bash
+oc create token "${SA_NAME}" -n "${SA_NAMESPACE}" --duration=8760h
+```
+
+Set `RHOAI_TOKEN` to the printed token and `RHOAI_PROJECT_NAME` to the project name the test should create (e.g. `automl-integration-tests`). Do not create that project beforehand.
+
+---
+
+#### Scenario 2: No automatic project creation (existing project)
+
+The project already exists (e.g. created with `oc new-project` or an existing RHOAI Data Science project). The ServiceAccount is created **in that project** and granted **edit** in that project.
+
+**1. Create or use the project:**
+
+```bash
+export RHOAI_PROJECT_NAME=automl-integration-tests
+oc new-project "${RHOAI_PROJECT_NAME}"
+```
+
+**2. Create the ServiceAccount in that project:**
+
+```bash
+oc create serviceaccount kfp-integration-tests -n "${RHOAI_PROJECT_NAME}"
+```
+
+**3. Grant edit in the project** (Secrets, DSPA CR, Routes):
+
+```bash
+oc adm policy add-role-to-user edit -z kfp-integration-tests -n "${RHOAI_PROJECT_NAME}"
+```
+
+**4. Create a token** and configure:
+
+```bash
+oc create token kfp-integration-tests -n "${RHOAI_PROJECT_NAME}" --duration=8760h
+```
+
+Set `RHOAI_TOKEN` to the printed token and `RHOAI_PROJECT_NAME` to that project name. No self-provisioner or extra cluster roles are required.
+
+---
+
+#### Token and test configuration (both scenarios)
+
+- Create token: `oc create token <sa-name> -n <sa-namespace> [--duration=8760h]`
+- If the token is in a Secret: `oc get secret <name> -n <namespace> -o jsonpath='{.data.token}' | base64 -d`
+- Set `RHOAI_TOKEN` and `RHOAI_PROJECT_NAME` in `.env` or Jenkins; no `oc` or kubeconfig needed at test time.
+
 ## Test layout
 
 - **`integration_config.py`** – Loads `.env`, defines `get_rhoai_config()`, and exposes `RHOAI_INTEGRATION_CONFIG` (single source of truth for AutoML integration skip and fixtures).
-- **`conftest.py`** – Pytest fixtures for the AutoML pipeline tests; adds the `tests` directory to `sys.path` so `integration_config` can be imported. When integration config is set, a **temporary kubeconfig** is created from `RHOAI_URL` and `RHOAI_TOKEN` (`.env`); the Kubernetes client uses this file instead of `~/.kube/config`.
+- **`conftest.py`** – Pytest fixtures for the AutoML pipeline tests; adds the `tests` directory to `sys.path` so `integration_config` can be imported. When integration config is set, a **temporary kubeconfig** is created from `RHOAI_URL` and `RHOAI_TOKEN`; the Kubernetes client uses this file instead of `~/.kube/config`.
 - **`test_pipeline_integration.py`** – AutoML integration test class marked with `@pytest.mark.integration` and `@pytest.mark.skipif(RHOAI_INTEGRATION_CONFIG is None, ...)`.
 
 ## Fixtures (conftest.py)
@@ -66,7 +154,7 @@ uv sync --extra test_automl
 # or: pip install -e ".[test_automl]"
 ```
 
-Run only AutoML integration tests (from repo root):
+Run only AutoML integration tests (from repo root, change path appropriately if run from somewhere else):
 
 ```bash
 uv run pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/test_pipeline_integration.py -m integration -v
@@ -83,6 +171,11 @@ Exclude AutoML integration tests:
 ```bash
 uv run pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/ -m "not integration" -v
 ```
+
+### Running in Jenkins
+
+In the Jenkins job, set environment variables from your credential store (e.g. bind `RHOAI_TOKEN` to a “Secret text” credential holding the service account token):  
+`RHOAI_URL`, `RHOAI_TOKEN`, `RHOAI_PROJECT_NAME`, S3 vars (`AWS_S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `RHOAI_TEST_DATA_BUCKET`), and optionally `RHOAI_KFP_URL`. No `oc` CLI or kubeconfig needed.
 
 To avoid the "Unknown pytest.mark.integration" warning, register the mark in `pyproject.toml` under `[tool.pytest.ini_options]`:
 

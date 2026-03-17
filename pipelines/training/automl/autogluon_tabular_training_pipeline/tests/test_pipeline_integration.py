@@ -80,7 +80,7 @@ def _find_artifacts_in_s3(s3_client, bucket, prefix):
 @pytest.mark.integration
 @pytest.mark.skipif(
     RHOAI_INTEGRATION_CONFIG is None,
-    reason="RHOAI integration env not set (set RHOAI_URL, RHOAI_TOKEN, S3 vars; see .env.template)",
+    reason="RHOAI integration env not set (set RHOAI_URL, RHOAI_TOKEN, S3 vars; use SA token for Jenkins; see .env.template)",
 )
 class TestAutogluonPipelineIntegration:
     """Integration tests running the pipeline on RHOAI and validating outcomes."""

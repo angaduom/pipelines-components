@@ -3,6 +3,9 @@
 Used by conftest.py (fixtures) and test_pipeline_integration.py (skipif) so
 skip logic and fixtures share one source of truth. Import this module instead
 of conftest to avoid resolving the repo-root conftest when running tests.
+
+Authentication: set RHOAI_TOKEN (e.g. a service account token for Jenkins/CI;
+long-lived, no oc or kubeconfig required).
 """
 
 import os
@@ -45,7 +48,11 @@ DSPA_READY_BUFFER_SECONDS_ENV = "RHOAI_DSPA_READY_BUFFER_SECONDS"
 
 
 def get_rhoai_config():
-    """Build integration config from environment; None if not configured."""
+    """Build integration config from environment; None if not configured.
+
+    All required vars must be set, including RHOAI_TOKEN (use a service account
+    token for Jenkins/CI; long-lived, no oc or kubeconfig needed).
+    """
     url = os.environ.get(RHOAI_URL_ENV)
     kfp_url = os.environ.get(RHOAI_KFP_URL_ENV)
     token = os.environ.get(RHOAI_TOKEN_ENV)
@@ -62,8 +69,8 @@ def get_rhoai_config():
         return None
     return {
         "rhoai_url": url.rstrip("/"),
-        "rhoai_kfp_url": kfp_url.rstrip("/") if not None else None,
-        "rhoai_token": token,
+        "rhoai_kfp_url": kfp_url.rstrip("/") if kfp_url is not None else None,
+        "rhoai_token": token.strip(),
         "rhoai_project": project or "kfp-integration-test",
         "s3_endpoint": endpoint,
         "s3_access_key": access,

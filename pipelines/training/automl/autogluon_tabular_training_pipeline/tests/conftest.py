@@ -1,5 +1,7 @@
 """Pytest fixtures for AutoGluon tabular training pipeline tests."""
 
+import base64
+import json
 import os
 import sys
 import tempfile
@@ -28,7 +30,7 @@ def _get_rhoai_config():
 
 @pytest.fixture(scope="session")
 def rhoai_integration_config():
-    """Session-scoped RHOAI integration config from env; None if not set."""
+    """Session-scoped RHOAI integration config from env; None if not set. Use RHOAI_TOKEN (e.g. SA token for Jenkins)."""
     return _get_rhoai_config()
 
 
@@ -114,19 +116,91 @@ def s3_client(rhoai_integration_config):
     )
 
 
+def _decode_jwt_sub(token: str) -> str | None:
+    """Decode JWT payload (no verify) and return the 'sub' claim, or None."""
+    try:
+        parts = token.strip().split(".")
+        if len(parts) != 3:
+            return None
+        payload_b64 = parts[1]
+        padding = 4 - len(payload_b64) % 4
+        if padding != 4:
+            payload_b64 += "=" * padding
+        payload = base64.urlsafe_b64decode(payload_b64)
+        data = json.loads(payload)
+        return data.get("sub")
+    except (ValueError, json.JSONDecodeError, KeyError):
+        return None
+
+
+def _parse_service_account_sub(sub: str) -> tuple[str, str] | None:
+    """If sub is 'system:serviceaccount:namespace:name', return (namespace, name); else None."""
+    if not sub or not isinstance(sub, str):
+        return None
+    prefix = "system:serviceaccount:"
+    if not sub.startswith(prefix):
+        return None
+    rest = sub[len(prefix) :].strip()
+    parts = rest.split(":")
+    if len(parts) != 2:
+        return None
+    return (parts[0].strip(), parts[1].strip())
+
+
+def _ensure_admin_role_for_sa_in_namespace(
+    rbac_v1,
+    namespace: str,
+    sa_namespace: str,
+    sa_name: str,
+    binding_name: str = "kfp-integration-tests-admin",
+):
+    """Create or replace a RoleBinding in namespace granting cluster role 'admin' to the ServiceAccount."""
+    from kubernetes import client
+    from kubernetes.client.rest import ApiException
+
+    role_ref = client.V1RoleRef(
+        api_group="rbac.authorization.k8s.io",
+        kind="ClusterRole",
+        name="admin",
+    )
+    subject = client.RbacV1Subject(
+        kind="ServiceAccount",
+        name=sa_name,
+        namespace=sa_namespace,
+    )
+    body = client.V1RoleBinding(
+        api_version="rbac.authorization.k8s.io/v1",
+        kind="RoleBinding",
+        metadata=client.V1ObjectMeta(name=binding_name),
+        role_ref=role_ref,
+        subjects=[subject],
+    )
+    try:
+        rbac_v1.create_namespaced_role_binding(namespace, body)
+    except ApiException as e:
+        if e.status == 409:
+            rbac_v1.replace_namespaced_role_binding(binding_name, namespace, body)
+        else:
+            raise
+
+
 @pytest.fixture(scope="session")
 def rhoai_project(rhoai_integration_config, s3_client, temp_kubeconfig_path):
     """
-    Ensure RHOAI test project exists: create Kubernetes namespace and S3 connection secret.
+    Ensure RHOAI test project exists: create if needed via OpenShift ProjectRequest (self-provisioner),
+    then create the S3 connection secret.
 
-    Uses temp kubeconfig from RHOAI_URL and RHOAI_TOKEN when temp_kubeconfig_path is set;
-    otherwise falls back to default kubeconfig or in-cluster config.
+    OpenShift normally grants the ProjectRequest creator (the ServiceAccount) admin in the new
+    project (same as oc new-project). If the cluster does not do that and we get 403 on the secret
+    create, we create a RoleBinding granting the SA admin; that requires the SA to be allowed to
+    create RoleBindings (see README_integration.md Option B).
     """
     if rhoai_integration_config is None:
         yield None
         return
     project_name = rhoai_integration_config["rhoai_project"]
     secret_name = rhoai_integration_config["s3_secret_name"]
+    token = rhoai_integration_config.get("rhoai_token")
     try:
         from kubernetes import client, config
         from kubernetes.client.rest import ApiException
@@ -143,12 +217,44 @@ def rhoai_project(rhoai_integration_config, s3_client, temp_kubeconfig_path):
         except Exception:
             pytest.skip("Could not load kubeconfig or in-cluster config")
     v1 = client.CoreV1Api()
-    namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=project_name))
+    rbac_v1 = client.RbacAuthorizationV1Api()
+
+    # Create project if it does not exist: prefer OpenShift ProjectRequest (self-provisioner).
+    project_request_group = "project.openshift.io"
+    project_request_version = "v1"
+    project_request_plural = "projectrequests"
+    project_just_created = False
     try:
-        v1.create_namespace(namespace)
+        co = client.CustomObjectsApi()
+        body = {
+            "apiVersion": f"{project_request_group}/{project_request_version}",
+            "kind": "ProjectRequest",
+            "metadata": {"name": project_name},
+        }
+        co.create_cluster_custom_object(
+            group=project_request_group,
+            version=project_request_version,
+            plural=project_request_plural,
+            body=body,
+        )
+        project_just_created = True
     except ApiException as e:
-        if e.status != 409:
+        if e.status == 409:
+            pass
+        elif e.status == 404 or e.status == 403:
+            namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=project_name))
+            try:
+                v1.create_namespace(namespace)
+                project_just_created = True
+            except ApiException as e2:
+                if e2.status != 409:
+                    raise
+        else:
             raise
+
+    # OpenShift normally grants the ProjectRequest creator (user or SA) admin in the new project
+    # (same as oc new-project). Try creating the secret first; only if we get 403 do we create a
+    # RoleBinding to grant the SA admin (for clusters that do not auto-grant SAs).
     secret = client.V1Secret(
         metadata=client.V1ObjectMeta(name=secret_name),
         type="Opaque",
@@ -159,11 +265,60 @@ def rhoai_project(rhoai_integration_config, s3_client, temp_kubeconfig_path):
             "AWS_DEFAULT_REGION": rhoai_integration_config["s3_region"],
         },
     )
+
+    def _create_or_replace_secret():
+        try:
+            v1.create_namespaced_secret(project_name, secret)
+            return
+        except ApiException as e:
+            if e.status == 409:
+                v1.replace_namespaced_secret(secret_name, project_name, secret)
+                return
+            if e.status == 403:
+                raise
+            raise
+
     try:
-        v1.create_namespaced_secret(project_name, secret)
+        _create_or_replace_secret()
     except ApiException as e:
-        if e.status != 409:
-            v1.replace_namespaced_secret(secret_name, project_name, secret)
+        if e.status != 403:
+            raise
+        # Cluster did not auto-grant the SA admin in the new project. Try to add a RoleBinding.
+        if not (project_just_created and token):
+            pytest.fail(
+                f"Cannot create secret in namespace {project_name!r}. "
+                f"Grant the ServiceAccount 'edit' or 'admin' in that namespace, e.g.:\n"
+                f"  oc adm policy add-role-to-user edit system:serviceaccount:<sa-namespace>:<sa-name> -n {project_name!r}"
+            )
+        sub = _decode_jwt_sub(token)
+        sa_identity = _parse_service_account_sub(sub) if sub else None
+        if not sa_identity:
+            pytest.fail(
+                f"Cannot create secret in namespace {project_name!r} and could not determine "
+                f"ServiceAccount from token. Grant the SA 'edit' or 'admin' in that namespace."
+            )
+        sa_namespace, sa_name = sa_identity
+        try:
+            _ensure_admin_role_for_sa_in_namespace(rbac_v1, project_name, sa_namespace, sa_name)
+        except ApiException as rb_e:
+            if rb_e.status == 403:
+                pytest.fail(
+                    "ServiceAccount cannot create RoleBindings in the new project. "
+                    "Either grant the SA a cluster role that allows creating rolebindings "
+                    "(see README_integration.md 'Option B'), or ensure the project template "
+                    "grants the requesting identity admin (default OpenShift behavior)."
+                )
+            raise
+        try:
+            _create_or_replace_secret()
+        except ApiException as e2:
+            if e2.status == 403:
+                pytest.fail(
+                    f"Cannot create secret in namespace {project_name!r} even after creating "
+                    f"admin RoleBinding. Grant the ServiceAccount 'edit' or 'admin' manually, e.g.:\n"
+                    f"  oc adm policy add-role-to-user edit system:serviceaccount:{sa_namespace}:{sa_name} -n {project_name!r}"
+                )
+            raise
     yield project_name
 
 
