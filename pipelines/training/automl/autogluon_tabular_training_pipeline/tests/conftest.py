@@ -616,7 +616,7 @@ def datascience_pipelines_application(rhoai_integration_config, rhoai_project, t
 @pytest.fixture(scope="session")
 def test_data_uploaded(rhoai_integration_config, s3_client):
     """
-    Upload minimal classification and regression CSV data to S3.
+    Upload classification and regression CSV data from tests/data/ to S3.
 
     Returns dict with keys: regression_bucket, regression_key, classification_bucket,
     classification_key; or None if integration not configured.
@@ -626,30 +626,12 @@ def test_data_uploaded(rhoai_integration_config, s3_client):
     bucket = rhoai_integration_config["s3_bucket_data"]
     prefix = "kfp-integration-test"
 
-    regression_csv = """feature_a,feature_b,price
-1.0,2.0,10.5
-2.0,3.0,20.0
-3.0,4.0,30.5
-4.0,5.0,41.0
-5.0,6.0,51.5
-6.0,7.0,62.0
-7.0,8.0,72.5
-8.0,9.0,83.0
-9.0,10.0,93.5
-10.0,11.0,104.0
-"""
-    classification_csv = """feature_a,feature_b,target
-1.0,2.0,0
-2.0,3.0,0
-3.0,4.0,1
-4.0,5.0,1
-5.0,6.0,0
-6.0,7.0,1
-7.0,8.0,1
-8.0,9.0,0
-9.0,10.0,1
-10.0,11.0,1
-"""
+    data_dir = _tests_dir / "data"
+    regression_path = data_dir / "regression.csv"
+    classification_path = data_dir / "classification.csv"
+    regression_csv = regression_path.read_text(encoding="utf-8")
+    classification_csv = classification_path.read_text(encoding="utf-8")
+
     try:
         s3_client.put_object(
             Bucket=bucket,

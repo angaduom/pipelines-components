@@ -384,3 +384,8 @@ tensorboard/
 
 # Exception for scripts/lib which is our shared Python library
 !scripts/lib/
+
+# Exception: test data CSVs under tests/data/ (e.g. AutoGluon pipeline integration tests)
+!**/tests/data/
+!**/tests/data/*.csv
+
