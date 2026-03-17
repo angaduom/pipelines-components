@@ -4,8 +4,9 @@ High-level tests that run the **AutoGluon tabular training pipeline** (AutoML) o
 
 ## Requirements
 
-- RHOAI cluster with Data Science Pipelines enabled and a pipeline server running.
+- RHOAI cluster with Data Science Pipelines enabled. A pipeline server does not need to be running beforehand: you can have the tests create a **DataSciencePipelinesApplication** (DSPA) dynamically by setting `RHOAI_CREATE_DSPA=true`; the operator will then deploy the pipeline server in the test namespace.
 - S3-compatible storage (e.g. MinIO or AWS S3) for AutoML pipeline test data and artifacts.
+- **Service Account setup** is required: create a Service Account and use its token for `RHOAI_TOKEN`. See [Creating a service account for the tests](#creating-a-service-account-for-the-tests) below.
 - Optional: `kubectl/oc` access (or in-cluster config) to create a test project (namespace) and S3 connection secret.
 
 ## Environment variables
@@ -15,7 +16,7 @@ Set these to enable the AutoML integration tests; otherwise they are skipped. Yo
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `RHOAI_URL` | Yes | Base URL of the OCP cluster (e.g. `https://api.example.com`). |
-| `RHOAI_KFP_URL` | No | KFP server URL where the client connects (e.g. `https://ds-pipeline-dspa-<project>.apps...`). |
+| `RHOAI_KFP_URL` | No | KFP server URL where the client connects. Omit when using `RHOAI_CREATE_DSPA=true` (the route URL is resolved automatically). |
 | `RHOAI_TOKEN` | Yes | API token; use a **service account token** for Jenkins/CI (long-lived, no oc or kubeconfig). |
 | `RHOAI_PROJECT_NAME` | No | RHOAI Project/namespace name for the test run (default: `kfp-integration-test`). |
 | `AWS_S3_ENDPOINT` | Yes | S3-compatible endpoint URL. |
@@ -26,6 +27,8 @@ Set these to enable the AutoML integration tests; otherwise they are skipped. Yo
 | `RHOAI_TEST_ARTIFACTS_BUCKET` | No | Bucket where pipeline artifacts are written (default: same as data bucket). |
 | `RHOAI_TEST_S3_SECRET_NAME` | No | Name of the Kubernetes secret holding S3 credentials in the project (default: `s3-connection`). |
 | `RHOAI_PIPELINE_RUN_TIMEOUT` | No | Timeout in seconds for waiting on a run (default: `3600`). |
+| `RHOAI_TEST_CONFIG_TAGS` | No | Comma-separated tags; if set, only test configs with at least one of these tags run (e.g. `smoke`, `regression`). See [Filtering by tags](#filtering-by-tags). |
+| `RHOAI_CREATE_DSPA` | No | Set to `true` or `1` to have the tests create a DataSciencePipelinesApplication CR; the operator deploys the pipeline server. See [Creating a DataSciencePipelinesApplication CR](#creating-a-datasciencepipelinesapplication-cr-dspa). |
 
 All required variables must be set for the AutoML integration tests to run; if any is missing, `RHOAI_INTEGRATION_CONFIG` is `None` and the tests are skipped with a reason pointing to `.env.template`.
 
@@ -33,9 +36,9 @@ All required variables must be set for the AutoML integration tests to run; if a
 
 Set **`RHOAI_TOKEN`** to an OpenShift API token. Follow [Scenario 1](#scenario-1-automatic-project-creation) (automatic project creation) or [Scenario 2](#scenario-2-no-automatic-project-creation-existing-project) (existing project) below to create the ServiceAccount and obtain a token; in Jenkins, store the token as a secret and bind it to `RHOAI_TOKEN`. Service account tokens are long-lived; no `oc` or kubeconfig is needed at test time.
 
-### Creating a service account for the tests
+### Creating a service account for the tests (required)
 
-Choose **one** of the two scenarios below. Both produce a token for `RHOAI_TOKEN`; no `oc` or kubeconfig is needed when running the tests.
+You must create a Service Account and use its token as `RHOAI_TOKEN` for the integration tests to authenticate to the cluster. Choose **one** of the two scenarios below. Both produce a token for `RHOAI_TOKEN`; no `oc` or kubeconfig is needed when running the tests.
 
 ---
 
@@ -121,7 +124,7 @@ Set `RHOAI_TOKEN` to the printed token and `RHOAI_PROJECT_NAME` to that project 
 
 - **`integration_config.py`** – Loads `.env`, defines `get_rhoai_config()`, and exposes `RHOAI_INTEGRATION_CONFIG` (single source of truth for AutoML integration skip and fixtures).
 - **`conftest.py`** – Pytest fixtures for the AutoML pipeline tests; adds the `tests` directory to `sys.path` so `integration_config` can be imported. When integration config is set, a **temporary kubeconfig** is created from `RHOAI_URL` and `RHOAI_TOKEN`; the Kubernetes client uses this file instead of `~/.kube/config`.
-- **`test_pipeline_integration.py`** – AutoML integration test class marked with `@pytest.mark.integration` and `@pytest.mark.skipif(RHOAI_INTEGRATION_CONFIG is None, ...)`.
+- **`test_pipeline_integration.py`** – AutoML integration test class marked with `@pytest.mark.integration` and `@pytest.mark.skipif(RHOAI_INTEGRATION_CONFIG is None, ...)`. Parametrized over configs from `test_configs.json` (filterable via `RHOAI_TEST_CONFIG_TAGS`).
 
 ## Fixtures (conftest.py)
 
@@ -135,15 +138,31 @@ Fixtures used by the AutoML pipeline integration tests:
 | `s3_client` | session | Boto3 S3 client for uploads and artifact checks; `None` if config missing or boto3 unavailable. |
 | `rhoai_project` | session | Ensures Kubernetes namespace and S3 connection secret exist; skips if kubeconfig/in-cluster config unavailable. |
 | `datascience_pipelines_application` | session | Optionally creates a **DataSciencePipelinesApplication** CR in the test namespace (see [Creating a DataSciencePipelinesApplication CR](#creating-a-datasciencepipelinesapplication-cr-dspa)). Yields the CR dict or `None`. |
-| `test_data_uploaded` | session | Uploads minimal regression and classification CSV data to S3; returns bucket/key dict or `None`. |
+| `uploaded_datasets` | session | Uploads dataset files from `test_configs.json` (by `dataset_path`) to S3; returns map `dataset_path` → `{"bucket", "key"}`. Empty dict when integration not configured. |
 | `kfp_client` | session | KFP client pointing at RHOAI (`rhoai_kfp_url`) with token auth; `None` if config missing. |
 | `compiled_pipeline_path` | session | Temp path to compiled AutoGluon tabular training pipeline YAML. |
 | `pipeline_run_timeout` | function | Timeout in seconds (from `RHOAI_PIPELINE_RUN_TIMEOUT` or `3600`). |
 
-## Test scenarios
+## Test scenarios and parametrization
 
-1. **Regression** – Runs the AutoML pipeline with `task_type=regression`, label `price`, waits for completion, then asserts success and presence of leaderboard, `.pkl` models, and `.ipynb` notebooks in the artifact store.
-2. **Classification** – Same flow with `task_type=binary` and label `target`.
+Scenarios are parametrized via test configs loaded from **`test_configs.json`** in this directory (optionally filtered by `RHOAI_TEST_CONFIG_TAGS`). Each configuration in the JSON array specifies:
+
+- **Dataset location** – `dataset_path`: path to the dataset file relative to the tests directory (e.g. `data/regression.csv`). The **`uploaded_datasets`** fixture uploads each unique path to S3 and returns a map used to resolve pipeline bucket/key.
+- **Target column** – `label_column` in the dataset.
+- **Problem type** – `problem_type`: `"classification"`, `"regression"`, or `"timeseries"` (reserved for future use).
+- **AutoML/pipeline settings** – `task_type` (`"binary"`, `"multiclass"`, `"regression"`) and `automl_settings` (e.g. `top_n`) merged into pipeline arguments.
+
+One integration test runs per config. To add a new scenario, add an object to the `test_configs.json` array with keys: `id`, `dataset_path`, `label_column`, `problem_type`, `task_type`, `automl_settings`, and optionally `tags` (list of strings for filtering). Put the dataset file under the tests directory at `dataset_path` (e.g. `data/my_dataset.csv`); it will be uploaded to S3 once per session.
+
+#### Filtering by tags
+
+Each config in `test_configs.json` can include a **`tags`** array (e.g. `["smoke", "regression"]`). Set **`RHOAI_TEST_CONFIG_TAGS`** to a comma-separated list of tags to run only configs that have at least one of those tags. If unset, all configs run. Example: `RHOAI_TEST_CONFIG_TAGS=smoke` runs only configs tagged `smoke`; `RHOAI_TEST_CONFIG_TAGS=classification,regression` runs configs tagged either `classification` or `regression`. You do not need to refer to config ids.
+
+Current configs:
+
+1. **regression** – `task_type=regression`, label `price`; tags: `regression`, `smoke`.
+2. **classification_binary** – `task_type=binary`, label `target`; tags: `classification`, `binary`, `smoke`.
+3. **classification_multiclass** – `task_type=multiclass`, label `target`; tags: `classification`, `multiclass`.
 
 ## Running the tests
 
@@ -158,6 +177,12 @@ Run only AutoML integration tests (from repo root, change path appropriately if 
 
 ```bash
 uv run pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/test_pipeline_integration.py -m integration -v
+```
+
+Run only configs with a given tag (e.g. smoke tests only):
+
+```bash
+RHOAI_TEST_CONFIG_TAGS=smoke uv run pytest pipelines/training/automl/autogluon_tabular_training_pipeline/tests/test_pipeline_integration.py -m integration -v
 ```
 
 Run all AutoML pipeline tests (unit + integration; integration tests skip if env not set):
@@ -175,7 +200,7 @@ uv run pytest pipelines/training/automl/autogluon_tabular_training_pipeline/test
 ### Running in Jenkins
 
 In the Jenkins job, set environment variables from your credential store (e.g. bind `RHOAI_TOKEN` to a “Secret text” credential holding the service account token):  
-`RHOAI_URL`, `RHOAI_TOKEN`, `RHOAI_PROJECT_NAME`, S3 vars (`AWS_S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `RHOAI_TEST_DATA_BUCKET`), and optionally `RHOAI_KFP_URL`. No `oc` CLI or kubeconfig needed.
+`RHOAI_URL`, `RHOAI_TOKEN`, `RHOAI_PROJECT_NAME`, S3 vars (`AWS_S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `RHOAI_TEST_DATA_BUCKET`). Either set `RHOAI_KFP_URL` (existing pipeline server) or `RHOAI_CREATE_DSPA=true` (tests create the DSPA and the operator deploys the server). No `oc` CLI or kubeconfig needed.
 
 To avoid the "Unknown pytest.mark.integration" warning, register the mark in `pyproject.toml` under `[tool.pytest.ini_options]`:
 
@@ -183,9 +208,12 @@ To avoid the "Unknown pytest.mark.integration" warning, register the mark in `py
 markers = ["integration: AutoML (RHOAI) integration tests (deselect with -m 'not integration')"]
 ```
 
-## Pipeline server
+## Pipeline server: existing vs dynamic
 
-The tests assume a pipeline server is already running in the cluster for the chosen project/namespace. RHOAI typically creates the server when you create a Data Science Project and enable pipelines. The fixture `rhoai_project` only creates the namespace and S3 secret; it does not start the AutoML pipeline server.
+You can run the integration tests in either of two ways:
+
+- **Existing pipeline server:** If a pipeline server is already running in the cluster (e.g. from a Data Science Project), set `RHOAI_KFP_URL` to its API URL. The `rhoai_project` fixture only ensures the namespace and S3 secret exist; it does not start a server.
+- **Dynamic server via DSPA:** Set `RHOAI_CREATE_DSPA=true` and the tests will create a **DataSciencePipelinesApplication** (DSPA) CR in the test namespace. The Data Science Pipelines Operator deploys the pipeline server; you do not need to set `RHOAI_KFP_URL` (the KFP client URL is resolved from the Route created by the operator). See the next section.
 
 ## Creating a DataSciencePipelinesApplication CR (DSPA)
 
@@ -193,23 +221,11 @@ You can have the test flow **create a DataSciencePipelinesApplication** custom r
 
 1. **Prerequisites:** The Data Science Pipelines Operator (or Open Data Hub operator) must be installed and the `DataSciencePipelinesApplication` CRD must exist on the cluster.
 2. **Enable creation:** Set `RHOAI_CREATE_DSPA=true` (or `1`) in your environment or `.env`.
-3. **Fixture:** Add the `datascience_pipelines_application` fixture to your test (or a dependent fixture). It runs after `rhoai_project` and creates one CR named `automl-test-dspa` in the same namespace. It yields the created CR dict (or `None` if creation is disabled or fails).
-4. **CRD identity:** Defaults are API group `datasciencepipelinesapplications.opendatahub.io`, version `v1alpha1`, plural `datasciencepipelinesapplications`. Override with `RHOAI_DSPA_API_GROUP`, `RHOAI_DSPA_API_VERSION`, `RHOAI_DSPA_PLURAL` if your cluster uses a different CRD.
+3. **Fixture:** The `datascience_pipelines_application` fixture is used by the integration tests (via the `kfp_client` dependency). It runs after `rhoai_project` and creates one CR named `automl-test-dspa` in the same namespace when `RHOAI_CREATE_DSPA=true`. It yields the created CR dict (or `None` if creation is disabled or fails).
+4. **CRD identity:** Defaults are API group `datasciencepipelinesapplications.opendatahub.io`, version `v1`, plural `datasciencepipelinesapplications`. Override with `RHOAI_DSPA_API_GROUP`, `RHOAI_DSPA_API_VERSION`, `RHOAI_DSPA_PLURAL` if your cluster uses a different CRD.
 5. **Spec:** The created CR uses a minimal `spec: {}`; the operator applies defaults. To customize (e.g. external object storage), extend the `body` in `_create_datascience_pipelines_application()` in `conftest.py` or load a spec from env/file.
 6. **KFP client URL:** When `RHOAI_CREATE_DSPA=true`, the **KFP client is configured from the OpenShift Route** created by the operator. The test flow lists `route.openshift.io/v1` Route resources in the DSPA namespace, picks the one whose name starts with `RHOAI_DSPA_ROUTE_NAME_PREFIX` (default: `ds-pipeline`), and uses `https://<route.spec.host>` as the API URL. It retries for up to `RHOAI_DSPA_ROUTE_WAIT_TIMEOUT` seconds (default: 300). You do not need to set `RHOAI_KFP_URL` when using DSPA creation unless the route cannot be resolved (e.g. different route name); then set `RHOAI_KFP_URL` as fallback or set `RHOAI_DSPA_ROUTE_NAME_PREFIX` to match your route.
 
-Example test that ensures the DSPA CR exists before running (optional; if you use an existing pipeline server you don't need this):
+The integration test already requests `datascience_pipelines_application` indirectly (via `kfp_client`). When `RHOAI_CREATE_DSPA=true`, the DSPA CR is created before the pipeline runs; when using an existing server, omit `RHOAI_CREATE_DSPA` and set `RHOAI_KFP_URL` instead.
 
-```python
-def test_autogluon_pipeline_regression(
-    self,
-    rhoai_integration_config,
-    rhoai_project,
-    datascience_pipelines_application,  # creates CR when RHOAI_CREATE_DSPA=true
-    test_data_uploaded,
-    kfp_client,
-    ...
-):
-```
-
-After the CR is created, the operator creates an OpenShift Route for the pipeline API. The `kfp_client` fixture waits up to `RHOAI_DSPA_ROUTE_WAIT_TIMEOUT` seconds for that route and configures the KFP client with its URL, so you do not need to set `RHOAI_KFP_URL` when using DSPA creation.
+After the CR is created, the operator creates an OpenShift Route for the pipeline API. The `kfp_client` fixture waits up to `RHOAI_DSPA_ROUTE_WAIT_TIMEOUT` seconds (default 300) for that route and then configures the client with its URL.

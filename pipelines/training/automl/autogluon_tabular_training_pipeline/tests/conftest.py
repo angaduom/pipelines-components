@@ -614,46 +614,46 @@ def datascience_pipelines_application(rhoai_integration_config, rhoai_project, t
 
 
 @pytest.fixture(scope="session")
-def test_data_uploaded(rhoai_integration_config, s3_client):
+def uploaded_datasets(rhoai_integration_config, s3_client):
     """
-    Upload classification and regression CSV data from tests/data/ to S3.
+    Upload dataset files referenced in test_configs.TEST_CONFIGS to S3.
 
-    Returns dict with keys: regression_bucket, regression_key, classification_bucket,
-    classification_key; or None if integration not configured.
+    Reads each unique dataset_path from the configs, uploads the file from
+    tests_dir / dataset_path to S3 under key kfp-integration-test/{dataset_path},
+    and returns a map: dataset_path -> {"bucket": str, "key": str}.
+
+    Returns empty dict if integration not configured; each path is uploaded once
+    even if multiple configs use the same file.
     """
     if rhoai_integration_config is None or s3_client is None:
-        return None
+        return {}
+    from test_configs import TEST_CONFIGS
+
     bucket = rhoai_integration_config["s3_bucket_data"]
     prefix = "kfp-integration-test"
-
-    data_dir = _tests_dir / "data"
-    regression_path = data_dir / "regression.csv"
-    classification_path = data_dir / "classification.csv"
-    regression_csv = regression_path.read_text(encoding="utf-8")
-    classification_csv = classification_path.read_text(encoding="utf-8")
-
-    try:
-        s3_client.put_object(
-            Bucket=bucket,
-            Key=f"{prefix}/regression.csv",
-            Body=regression_csv.encode("utf-8"),
-            ContentType="text/csv",
-        )
-        s3_client.put_object(
-            Bucket=bucket,
-            Key=f"{prefix}/classification.csv",
-            Body=classification_csv.encode("utf-8"),
-            ContentType="text/csv",
-        )
-    except Exception as e:
-        pytest.skip(f"Failed to upload test data to S3: {e}")
-
-    return {
-        "regression_bucket": bucket,
-        "regression_key": f"{prefix}/regression.csv",
-        "classification_bucket": bucket,
-        "classification_key": f"{prefix}/classification.csv",
-    }
+    result = {}
+    seen_paths = set()
+    for config in TEST_CONFIGS:
+        rel_path = config.dataset_path
+        if rel_path in seen_paths:
+            continue
+        seen_paths.add(rel_path)
+        full_path = _tests_dir / rel_path
+        if not full_path.is_file():
+            pytest.skip(f"Test dataset not found: {full_path}")
+        try:
+            body = full_path.read_bytes()
+            key = f"{prefix}/{rel_path}"
+            s3_client.put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=body,
+                ContentType="text/csv",
+            )
+            result[rel_path] = {"bucket": bucket, "key": key}
+        except Exception as e:
+            pytest.skip(f"Failed to upload test data {rel_path} to S3: {e}")
+    return result
 
 
 @pytest.fixture(scope="session")

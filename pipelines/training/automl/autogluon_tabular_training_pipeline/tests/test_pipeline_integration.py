@@ -5,10 +5,9 @@ enabled, and environment variables set for cluster URL, credentials, and S3 stor
 See the conftest.py in this directory for required env vars. When not set, tests
 are skipped. You can set vars via a .env file (see .env.template).
 
-Scenarios:
-- Classification: run pipeline with task_type=binary (or multiclass), validate success
-  and artifacts (leaderboard, .pkl models, .ipynb notebooks).
-- Regression: run pipeline with task_type=regression, same validations.
+Scenarios are parametrized via test_configs: each config specifies dataset
+location, target column, problem type, AutoML/pipeline settings, and optional
+tags. Filter by tags with RHOAI_TEST_CONFIG_TAGS (e.g. smoke, regression).
 """
 
 import secrets
@@ -17,6 +16,10 @@ from datetime import datetime, timezone
 import pytest
 
 from integration_config import RHOAI_INTEGRATION_CONFIG
+from test_configs import get_test_configs_for_run, resolve_config_to_pipeline_arguments
+
+# Configs to run this session (all, or filtered by RHOAI_TEST_CONFIG_TAGS).
+CONFIGS_FOR_RUN = get_test_configs_for_run()
 
 # Pipeline display name in KFP (from pipeline decorator)
 PIPELINE_DISPLAY_NAME = "autogluon-tabular-training-pipeline"
@@ -82,82 +85,33 @@ def _find_artifacts_in_s3(s3_client, bucket, prefix):
     RHOAI_INTEGRATION_CONFIG is None,
     reason="RHOAI integration env not set (set RHOAI_URL, RHOAI_TOKEN, S3 vars; use SA token for Jenkins; see .env.template)",
 )
+@pytest.mark.parametrize("test_config", CONFIGS_FOR_RUN, ids=[c.id for c in CONFIGS_FOR_RUN])
 class TestAutogluonPipelineIntegration:
     """Integration tests running the pipeline on RHOAI and validating outcomes."""
 
-    def test_autogluon_pipeline_regression(
+    def test_autogluon_pipeline_with_config(
         self,
+        test_config,
         rhoai_integration_config,
         rhoai_project,
-        test_data_uploaded,
+        uploaded_datasets,
         kfp_client,
         compiled_pipeline_path,
         pipeline_run_timeout,
         s3_client,
     ):
-        """Run pipeline for regression task; assert success and presence of artifacts."""
-        if not test_data_uploaded or not kfp_client:
+        """Run pipeline for one test config; assert success and presence of artifacts."""
+        if not uploaded_datasets or not kfp_client:
             pytest.skip("Integration prerequisites not available")
-        data = test_data_uploaded
+        if test_config.problem_type == "timeseries":
+            pytest.skip("Timeseries not yet supported by pipeline or test data")
         config = rhoai_integration_config
-        secret_name = config["s3_secret_name"]
-
-        arguments = {
-            "train_data_secret_name": secret_name,
-            "train_data_bucket_name": data["regression_bucket"],
-            "train_data_file_key": data["regression_key"],
-            "label_column": "price",
-            "task_type": "regression",
-            "top_n": 2,
-        }
-        run_id, detail = _run_pipeline_and_wait(
-            kfp_client, compiled_pipeline_path, arguments, pipeline_run_timeout
+        arguments = resolve_config_to_pipeline_arguments(
+            test_config, uploaded_datasets, config["s3_secret_name"]
         )
-        assert _run_succeeded(detail), (
-            f"Pipeline run {run_id} did not succeed; state={getattr(detail, 'run', detail)}"
-        )
+        if not arguments:
+            pytest.skip(f"Dataset not available for path: {test_config.dataset_path}")
 
-        if s3_client and config.get("s3_bucket_artifacts"):
-            bucket = config["s3_bucket_artifacts"]
-            prefix = f"{PIPELINE_DISPLAY_NAME}/{run_id}"
-            pkl_keys, ipynb_keys, leaderboard_keys = _find_artifacts_in_s3(
-                s3_client, bucket, prefix
-            )
-            assert len(pkl_keys) >= 1, (
-                f"Expected at least one .pkl model artifact under {prefix}; found {pkl_keys}"
-            )
-            assert len(ipynb_keys) >= 1, (
-                f"Expected at least one .ipynb notebook under {prefix}; found {ipynb_keys}"
-            )
-            assert len(leaderboard_keys) >= 1, (
-                f"Expected leaderboard/html artifact under {prefix}; found {leaderboard_keys}"
-            )
-
-    def test_autogluon_pipeline_classification(
-        self,
-        rhoai_integration_config,
-        rhoai_project,
-        test_data_uploaded,
-        kfp_client,
-        compiled_pipeline_path,
-        pipeline_run_timeout,
-        s3_client,
-    ):
-        """Run pipeline for classification task; assert success and presence of artifacts."""
-        if not test_data_uploaded or not kfp_client:
-            pytest.skip("Integration prerequisites not available")
-        data = test_data_uploaded
-        config = rhoai_integration_config
-        secret_name = config["s3_secret_name"]
-
-        arguments = {
-            "train_data_secret_name": secret_name,
-            "train_data_bucket_name": data["classification_bucket"],
-            "train_data_file_key": data["classification_key"],
-            "label_column": "target",
-            "task_type": "binary",
-            "top_n": 2,
-        }
         run_id, detail = _run_pipeline_and_wait(
             kfp_client, compiled_pipeline_path, arguments, pipeline_run_timeout
         )
