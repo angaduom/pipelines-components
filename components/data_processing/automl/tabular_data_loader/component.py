@@ -115,15 +115,15 @@ def automl_data_loader(  # noqa: D417
             sampling_method = "random"
         logger.info("Sampling method derived from task_type=%s: using %s", task_type, sampling_method)
     else:
+        if sampling_method not in VALID_SAMPLING_METHODS:
+            raise ValueError(
+                f"sampling_method must be one of {VALID_SAMPLING_METHODS} or None; got {sampling_method!r}."
+            )
         if sampling_method == "stratified" and task_type not in ("binary", "multiclass"):
             raise ValueError(
                 "Stratified sampling is only available when task_type is "
                 "'binary' or 'multiclass' (classification tasks). "
                 f"Got task_type='{task_type}'."
-            )
-        if sampling_method not in VALID_SAMPLING_METHODS:
-            raise ValueError(
-                f"sampling_method must be one of {VALID_SAMPLING_METHODS} or None; got {sampling_method!r}."
             )
         logger.info("Performing sampling: method=%s", sampling_method)
 
