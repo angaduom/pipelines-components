@@ -81,10 +81,10 @@ def automl_data_loader(  # noqa: D417
 
     # Input validation
     for param, value in (
-            ("bucket_name", bucket_name),
-            ("file_key", file_key),
-            ("workspace_path", workspace_path),
-            ("label_column", label_column),
+        ("bucket_name", bucket_name),
+        ("file_key", file_key),
+        ("workspace_path", workspace_path),
+        ("label_column", label_column),
     ):
         if not isinstance(value, str) or not value.strip():
             raise TypeError(f"{param} must be a non-empty string.")
