@@ -108,14 +108,24 @@ def automl_data_loader(  # noqa: D417
     elif selection_train_size <= 0 or selection_train_size >= 1:
         raise ValueError("selection_train_size must be in a range 0 to 1.")
 
-    if sampling_method is not None and sampling_method not in VALID_SAMPLING_METHODS:
-        raise ValueError(f"sampling_method must be one of {VALID_SAMPLING_METHODS} or None; got {sampling_method!r}.")
-    if sampling_method == "stratified" and task_type not in ("binary", "multiclass"):
-        raise ValueError(
-            "Stratified sampling is only available when task_type is "
-            "'binary' or 'multiclass' (classification tasks)."
-            f"Got task_type='{task_type}'."
-        )
+    if sampling_method is None:
+        if task_type in ("binary", "multiclass"):
+            sampling_method = "stratified"
+        else:
+            sampling_method = "random"
+        logger.info("Sampling method derived from task_type=%s: using %s", task_type, sampling_method)
+    else:
+        if sampling_method == "stratified" and task_type not in ("binary", "multiclass"):
+            raise ValueError(
+                "Stratified sampling is only available when task_type is "
+                "'binary' or 'multiclass' (classification tasks). "
+                f"Got task_type='{task_type}'."
+            )
+        if sampling_method not in VALID_SAMPLING_METHODS:
+            raise ValueError(
+                f"sampling_method must be one of {VALID_SAMPLING_METHODS} or None; got {sampling_method!r}."
+            )
+        logger.info("Performing sampling: method=%s", sampling_method)
 
     def get_s3_client():
         """Create and return an S3 client using credentials from environment variables."""
