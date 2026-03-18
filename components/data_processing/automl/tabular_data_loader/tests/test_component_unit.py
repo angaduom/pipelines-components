@@ -154,7 +154,7 @@ class TestAutomlDataLoaderUnitTests:
         sampled_test = _make_test_artifact(tmp_path)
 
         with _mock_boto3_and_pandas() as mock_s3:
-            with pytest.raises(ValueError, match="label_column must be provided when sampling_method='stratified'"):
+            with pytest.raises(TypeError, match="label_column must be a non-empty string"):
                 automl_data_loader.python_func(
                     file_key="data/file.csv",
                     bucket_name="bucket",
@@ -496,7 +496,7 @@ class TestDataLoaderSplitLogic:
         sampled_test = _make_test_artifact(tmp_path)
 
         with _mock_boto3_and_pandas() as mock_s3:
-            with pytest.raises(ValueError, match=r"Invalid task_type"):
+            with pytest.raises(ValueError, match=r"task_type must be one of .*; got 'invalid'."):
                 automl_data_loader.python_func(
                     file_key="data/file.csv",
                     bucket_name="bucket",
@@ -514,7 +514,7 @@ class TestDataLoaderSplitLogic:
         sampled_test = _make_test_artifact(tmp_path)
 
         with _mock_boto3_and_pandas():
-            with pytest.raises(ValueError, match=r"Invalid sampling_method"):
+            with pytest.raises(ValueError, match=r"sampling_method must be one of .* or None; got 'invalid'."):
                 automl_data_loader.python_func(
                     file_key="data/file.csv",
                     bucket_name="bucket",
