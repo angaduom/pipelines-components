@@ -178,6 +178,8 @@ def autogluon_tabular_training_pipeline(
         top_n=top_n,
         workspace_path=dsl.WORKSPACE_PATH_PLACEHOLDER,
     )
+    selection_task.set_cpu_limit('2') \
+        .set_memory_limit('4Gi')
 
     # Stage 2: Model Refitting
     # Refit each top model on the full training dataset
@@ -195,6 +197,8 @@ def autogluon_tabular_training_pipeline(
             sample_row=data_loader_task.outputs["sample_row"],
             extra_train_data_path=data_loader_task.outputs["extra_train_data_path"],
         )
+        refit_full_task.set_cpu_limit('2') \
+            .set_memory_limit('4Gi')
 
     # Generate leaderboard
     leaderboard_evaluation(

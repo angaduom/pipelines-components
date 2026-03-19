@@ -131,6 +131,7 @@ def automl_data_loader(  # noqa: D417
             region_name=region_name,
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
+            verify=False
         )
 
     def _sample_first_n_rows(text_stream, chunk_size, max_size_bytes):

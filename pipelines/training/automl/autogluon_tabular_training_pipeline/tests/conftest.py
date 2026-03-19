@@ -113,6 +113,7 @@ def s3_client(rhoai_integration_config):
         aws_access_key_id=c["s3_access_key"],
         aws_secret_access_key=c["s3_secret_key"],
         region_name=c["s3_region"],
+        verify=False if c["s3_internal_endpoint"] else True
     )
 
 
@@ -261,8 +262,8 @@ def rhoai_project(rhoai_integration_config, s3_client, temp_kubeconfig_path):
         string_data={
             "AWS_ACCESS_KEY_ID": rhoai_integration_config["s3_access_key"],
             "AWS_SECRET_ACCESS_KEY": rhoai_integration_config["s3_secret_key"],
-            "AWS_S3_ENDPOINT": rhoai_integration_config["s3_endpoint"],
-            "AWS_DEFAULT_REGION": rhoai_integration_config["s3_region"],
+            "AWS_S3_ENDPOINT": rhoai_integration_config["s3_internal_endpoint"] if rhoai_integration_config["s3_internal_endpoint"] else rhoai_integration_config["s3_endpoint"],
+            "AWS_DEFAULT_REGION": rhoai_integration_config["s3_region"]
         },
     )
 
@@ -327,10 +328,11 @@ def _create_datascience_pipelines_application(
     dspa_config,
     resource_name="automl-test-dspa",
     kubeconfig_path=None,
-    object_storage_host=None,
+    object_storage_url=None,
     object_storage_region=None,
     object_storage_secret_name=None,
     object_storage_bucket=None,
+    object_storage_internal_url=None
 ):
     """
     Create a DataSciencePipelinesApplication CR in the given namespace using CustomObjectsApi.
@@ -362,20 +364,28 @@ def _create_datascience_pipelines_application(
 
     # CRD requires spec.objectStorage: either internal (operator MinIO) or external (existing S3).
     if object_storage_secret_name and object_storage_bucket:
+
+        object_storage_host = object_storage_internal_url.lstrip("http://").rstrip(":" + str(object_storage_internal_url.split(":")[2])) if object_storage_internal_url \
+            else object_storage_url.lstrip("https://").split(":")[0]
+        object_storage_port = object_storage_internal_url.split(":")[2] if object_storage_internal_url \
+            else ""
+        object_storage_scheme = "http" if object_storage_internal_url \
+            else "https"
+
         object_storage = {
             "externalStorage": {
                 "basePath": "",
                 "bucket": object_storage_bucket,
-                "host": object_storage_host.lstrip("https://"),
-                "port": "",
+                "host": object_storage_host,
+                "port": object_storage_port,
                 "region": object_storage_region,
                 "s3CredentialsSecret": {
                     "accessKey": "AWS_ACCESS_KEY_ID",
                     "secretKey": "AWS_SECRET_ACCESS_KEY",
                     "secretName": object_storage_secret_name
                 },
-                "scheme": "https"
-            }
+                "scheme": object_storage_scheme
+            },
         }
     else:
         object_storage = {"internal": {}}
@@ -579,10 +589,11 @@ def datascience_pipelines_application(rhoai_integration_config, rhoai_project, t
         dspa_config,
         kubeconfig_path=temp_kubeconfig_path,
         object_storage_secret_name=rhoai_integration_config.get("s3_secret_name"),
-        object_storage_host=rhoai_integration_config.get("s3_endpoint"),
+        object_storage_url=rhoai_integration_config.get("s3_endpoint"),
         object_storage_region=rhoai_integration_config.get("s3_region"),
         object_storage_bucket=rhoai_integration_config.get("s3_bucket_artifacts")
         or rhoai_integration_config.get("s3_bucket_data"),
+        object_storage_internal_url=rhoai_integration_config.get("s3_internal_endpoint"),
     )
     if created is None and error_message:
         import logging
@@ -690,6 +701,7 @@ def kfp_client(rhoai_integration_config, datascience_pipelines_application, temp
         host=host,
         namespace=rhoai_integration_config["rhoai_project"],
         existing_token=rhoai_integration_config.get("rhoai_token"),
+        verify_ssl=False if rhoai_integration_config.get("s3_internal_endpoint") else True,
     )
     return client
 

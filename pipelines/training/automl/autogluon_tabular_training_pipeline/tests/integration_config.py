@@ -26,6 +26,7 @@ S3_ENDPOINT_ENV = "AWS_S3_ENDPOINT"
 S3_ACCESS_KEY_ENV = "AWS_ACCESS_KEY_ID"
 S3_SECRET_KEY_ENV = "AWS_SECRET_ACCESS_KEY"
 S3_REGION_ENV = "AWS_DEFAULT_REGION"
+S3_INTERNAL_ENDPOINT_ENV = "AWS_S3_INTERNAL_ENDPOINT"
 S3_BUCKET_DATA_ENV = "RHOAI_TEST_DATA_BUCKET"
 S3_BUCKET_ARTIFACTS_ENV = "RHOAI_TEST_ARTIFACTS_BUCKET"
 S3_SECRET_NAME_ENV = "RHOAI_TEST_S3_SECRET_NAME"
@@ -61,6 +62,7 @@ def get_rhoai_config():
     access = os.environ.get(S3_ACCESS_KEY_ENV)
     secret = os.environ.get(S3_SECRET_KEY_ENV)
     region = os.environ.get(S3_REGION_ENV, "us-east-1")
+    internal_endpoint = os.environ.get(S3_INTERNAL_ENDPOINT_ENV)
     bucket_data = os.environ.get(S3_BUCKET_DATA_ENV)
     bucket_artifacts = os.environ.get(S3_BUCKET_ARTIFACTS_ENV)
     secret_name = os.environ.get(S3_SECRET_NAME_ENV, "s3-connection")
@@ -73,6 +75,7 @@ def get_rhoai_config():
         "rhoai_token": token.strip(),
         "rhoai_project": project or "kfp-integration-test",
         "s3_endpoint": endpoint,
+        "s3_internal_endpoint": internal_endpoint,
         "s3_access_key": access,
         "s3_secret_key": secret,
         "s3_region": region,
