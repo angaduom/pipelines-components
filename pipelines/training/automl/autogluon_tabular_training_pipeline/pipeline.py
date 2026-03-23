@@ -154,6 +154,7 @@ def autogluon_tabular_training_pipeline(
         label_column=label_column,
         task_type=task_type,
     )
+    data_loader_task.set_caching_options(False)
 
     use_secret_as_env(
         data_loader_task,
@@ -178,6 +179,7 @@ def autogluon_tabular_training_pipeline(
         top_n=top_n,
         workspace_path=dsl.WORKSPACE_PATH_PLACEHOLDER,
     )
+    selection_task.set_caching_options(False)
 
     # Stage 2: Model Refitting
     # Refit each top model on the full training dataset
@@ -195,12 +197,13 @@ def autogluon_tabular_training_pipeline(
             sample_row=data_loader_task.outputs["sample_row"],
             extra_train_data_path=data_loader_task.outputs["extra_train_data_path"],
         )
+        refit_full_task.set_caching_options(False)
 
     # Generate leaderboard
     leaderboard_evaluation(
         models=dsl.Collected(refit_full_task.outputs["model_artifact"]),
         eval_metric=selection_task.outputs["eval_metric"],
-    )
+    ).set_caching_options(False)
 
 
 if __name__ == "__main__":
