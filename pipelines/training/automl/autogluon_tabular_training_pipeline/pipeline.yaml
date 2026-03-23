@@ -2,12 +2,12 @@
 # PIPELINE DEFINITION
 # Name: autogluon-tabular-training-pipeline
 # Description: End-to-end AutoGluon tabular training pipeline implementing a two-stage
-#   approach: first builds and selects top-performing models on sampled data, then refits
-#   them on the full dataset. The pipeline loads data from S3, splits it into train/test
-#   sets, trains multiple AutoGluon models using ensembling (stacking and bagging), selects
-#   the top N performers, refits each on the complete training data in parallel, and
-#   finally evaluates all refitted models to generate a comprehensive leaderboard with
-#   performance metrics.
+#   approach: first builds and selects top-performing models on sampled data, then
+#   refits them on the full dataset. The pipeline loads data from S3, splits it into
+#   train/test sets, trains multiple AutoGluon models using ensembling (stacking and
+#   bagging), selects the top N performers, refits each on the complete training data
+#   in parallel, and finally evaluates all refitted models to generate a comprehensive
+#   leaderboard with performance metrics.
 # Inputs:
 #    label_column: str
 #    task_type: str
@@ -288,241 +288,16 @@ deploymentSpec:
 
           printf "%s" "$0" > "$program_path/ephemeral_component.py"
 
-          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main \
-          --component_module_path \
-          "$program_path/ephemeral_component.py" \
-          "$@"
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
 
           '
           - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\n__KFP_EMBEDDED_ARCHIVE_B64 = (\
-
-          \     'H4sIAC6XumkC/+087XLjRnL720+ByJWytF5w8UkAzsl1EklJlAlQEilRpHdLNwAGJEh8MA' +\
-
-          \     'QoErzcG+RX8gCpvGEeId0DUJRErm9XK/sSG1O1loCZ7unv7hmoXXlfef/nC7I8o8Slsze/' +\
-
-          \     'yhDy8amfgiDLm9/xvShIoviGW775DcY8SckMtn/zxxySxoWpH9JDUdNkXVJEVakIOvwQv3' +\
-
-          \     'lTjt//qLz/9fdAp9ZUNf9ZzX8KkvLE58Hg1KpSVSRZAv+HAKC94dTf0v8XUbyIh/EnQyAs' +\
-
-          \     '87zfo/7/L8R/ZTv+S2X8/03iv74z/guqoJQJ4A8R/52AJInv+Q5J/Ti6i+KU2nE8qfjTLL' +\
-
-          \     'Jfzf+rivKJ+C9Lgio/i/9VTRPecMJv6f9/0Pj/12+4PYcGQbL3A/fzNxwHz1z+5i7NphTe' +\
-
-          \     '7oVkNnHjRbT3js35Lr4kouQaqkZ4RxZlXqGGxMOjziuKVyWKrlYFVy0AQpoSl6QEwP76t/' +\
-
-          \     'xVEs9nDi22hOd/+vlonsZmizsmUURnH/dx/Q9+SIb0fXI//H4ZBv9ik4RWlXcXdUOxe4uh' +\
-
-          \     'G95kjhTc22PBNzvKoukfB3Zo3Q9Og/lgJfju7VXY6g79i5Xy08WZJQ2yY2lwe74iPWN+0W' +\
-
-          \     'kuW+OG3zwbpfapurronMfu2dWi7ev3ruzKrchZtUIjG2R6ZtaPFi0Z4ZtDeiomdmRW6ely' +\
-
-          \     'aoeJ0QxHgnt2VG1lBkA5c3dlzm35PGqtGmq7O7kv1sE+Q6M5Pl7QGuDoAr1nx0pzGJ83zw' +\
-
-          \     'bTwa1bs2WcPxqataOltZpIzXpjYcJaR75S7dNr2Odm3u+dJ4OO6Pd71mwgn9+7PXXSDtXA' +\
-
-          \     'zY4WzTrAdh3V8o+WQK8GskAZVR35eNSXAD46zga3VuBEg6A5ZvIQaG8ZNM+uVAfxR1cBPb' +\
-
-          \     'u878vWCudrHXXl1o+1QRgkdk3MXFjbDm+kQU8F+V5qfWk5dXa8Z+vrU9EJF3FTtHpXQtC4' +\
-
-          \     'XZ14P3VTozaczB35ckmlwdQ+XVTt0JgPuunKPTu/J9J1tSkMTq8m8G/88C51pWDing6r5q' +\
-
-          \     'N3di8QQI8J6YlTtx4Dvw+4sxfh7ihiW7YEJzRmIN+U3F4FTgh6g33a48aiLQuFPKyCv3jM' +\
-
-          \     'cMG/zdwVzBlztyaGfaDLPptUz4VRYJ8NAvc0GPc7x+3B7U1wni2Gl7fn035vkTTPrBHYUu' +\
-
-          \     'pINxnp9TXvMj5vRZZg3aahLalC69aa0vC6aq7OF3TDo7TmsbmyGqZwubrazMmbucmq3b1W' +\
-
-          \     '25s5hUrGAmxn6gJtZk3J2sVaF2T5U83q3kzc86sTPbvNJhroc9QPl0Grdw72k0YgG9EOL0' +\
-
-          \     'GuN/KG52DNszzoBRE5u6xa3SMmr4uaAXIOkkEXbe086MuXw0LeYOcNud3t+83TUUB6buzW' +\
-
-          \     'wR8ADmw2JL1lAr45Nrv9pTVuSE1f/742XoKu1aB/e37mhCcT0ruBPY+nA4C7Fgdnnesrz7' +\
-
-          \     'zRAZ+b9XtXU6BduOmpwKcJdn2zAlvpOqcn48G1Mb8BH0DfMMEHrXpz3q4DHWeTJewpor/R' +\
-
-          \     'ehPoc9TW2FnCOtWE2AI8+Rfgq+gztnw0tKVBCDoTAAZpLvgUfPDVe/CJsS0t750x2khfuh' +\
-
-          \     'wPaoyH4UTP54/vB+EAaLpEf5+bLAblvggxaOWeGotWz7q3T42s7VsnVyAX8Ge/BTGs1l2y' +\
-
-          \     '+eapEQ4iK2Byqymy1XkUJyJGY9qXjMSWm2D3Vh3jF/B2/wkelr/Ew+V1A/df5HpYAF0QW3' +\
-
-          \     'sn2ZV8PoI4G9jRJb4ftToC2PWNYAui2WwEAK/cd0+NyM6OFzbKvjcCWPAr/ygFfqf27THo' +\
-
-          \     'FGJf73I4kG7u7d4N+F8whrm4f3scNGtCCvTqoDeB1I7HgGPlrJC+S5T5BGRlWd3m3KotBK' +\
-
-          \     'ujqP3VUWr6yqpVb8zbNUGA2J5YNWXZ6l7OzVuTPYOfK606PHcW8HzStbpDWLsAvS9Ey1fE' +\
-
-          \     'Vv16YdePEvPURFxZqw766QCubmNuZQxnamaKWhsG9Ye9fYD3FQHwSgCftcaXiVW/nrdv42' +\
-
-          \     'G368it8XXC1vYAZw32B1yAE3LPZU4vPLc7wqo1vhkDfRnSa3UWC7C/tF1TJDZfE5Ym8pgJ' +\
-
-          \     'gH+CNACe4dz0BZwHuq5ToH8JdI1zeGGBtLZxvzqjfWn6yPMI5s3EZLz0Eyt72A/xi4B/we' +\
-
-          \     'TkKyry3u4sxNZ4iM9yqw779cwFey7wmtkC+JigXIF/SwJ5FzjYGpHJrYZrgHe2pjk3F/E5' +\
-
-          \     '6Apox/fXCCvie5Djiv08NeF9E2WVsfU+yorRBHpg8wvAm67xtx/J0vWRL5BjDeTUZbpayx' +\
-
-          \     'feD8aMHrZ+kusXbcNHmTZQfiLKD2BXBV2wXx9lAM/DtA3P/VUTZQnrncRiumO2tDSZvZ2M' +\
-
-          \     'LcbLUdLu5PJp4xzopVUHmvxFVsgS1vQL2V3iWimX2WXC9A9yt9haJ8nt+XpuDXOZwftFIe' +\
-
-          \     '9sjR/1iPrKcUxQ7jLIKV/TNRl9KJNW96iwq8uUrWH6LXQFdN+M+yLsgfACrjXZ2mHKnlHX' +\
-
-          \     'uf2umE/4COck7JnZM641f6r1mJ4lBp+hHIu9uteFHk8klFn71FzjFpl91pgOC5mDziWm40' +\
-
-          \     'JXzZTZX3cte3eV/77YzKHdIEy9kaxx5rK5ZDJ0x6AnyK2FnHHfJZNHbu9IM3uGfVOrsCvm' +\
-
-          \     '9+BXAC8VPgX8XEnM7yRzVdiozPRT2AzTP9gM0FLsYaLvrtD+LcaDg3il3BbNQp/M9kDGbI' +\
-
-          \     '2EtlHoG/y08IFsIbF9OvBz7Erg1ys2z+AdjHM5nI/zJ2NYz/RqFT7WRv5QJsx/wf9rON9P' +\
-
-          \     'GI1oB+wZ4FCPTHZCvo7x3kC9LpjPrOMJ01fh92hjt30mN/CPYg36Begq/wn8Q+W0mqDORI' +\
-
-          \     'zVrTrk1/p1HoNWDvKFMVSkPstRel8KMqgvg+aplfRvrRXLi3XIk6eWgnkafRVywJiyHA6x' +\
-
-          \     'FvMf5mmgp6gXxuT2HHLG9RDwjBzZZHnR9JvDPquzLxXgD/GpgE+yCni03c+D7wPtwzW8CP' +\
-
-          \     'rIgJ4sP1P0Wa6+OGP19BBqTajxrBDOBCnwkfZvrzJyO4zNTlGzd7BeB3urN4dWdzI3V+YU' +\
-
-          \     'eXuU71ZYH1g1yNH1a/9iciJCDWB164t79/RGceub+opiPTA2i3PNBOg0hWe4gL9jmUBVTn' +\
-
-          \     'At8E1Ob6YDaYR1wMos5M/w1o4hH5/MHWlw74QCnD/EEfAypbXhktEN55Rmnekia3eORIxj' +\
-
-          \     'lj/xn+rMgbrkUmD0d5rfX5+eZC7WP/5xB/N+B3J7s2EsoF7rktMghLnjTvcRX+zsdDNyJp' +\
-
-          \     'u6rnkaYO5/VKs2h4OHWuTqxg4DwWFnPzjrBBbWu0FXUm8c6RrPYFjnwQkH/RLPYQ2Q0fWC' +\
-
-          \     '1YOof3Z+wvfN/P34UzXXL9Rbq4bEalf/k/UW+NJ19rV1ozVufm3dqLRr/+i6cZkNepaQn4' +\
-
-          \     '3By6CueWavyhN77R5lmLfhXVycN/AssabxC+y2AdxBHO/2BTO3XWHbds1Htou+N/EvAjhD' +\
-
-          \     'gx32kVf/uG3LV0E/NO7J6pHN4rkndEBvh4cHe3i18RH+w+48PvdeRaAGIZrkff7dybffcl' +\
-
-          \     'ZxZ8c5cZTSKP1Q4OT2Nr91R37CrS/3uICmCZfFcy6IicsRzhnFCY04vIUBXcURF8YuDThv' +\
-
-          \     'FodcR37HkcjlZvOIm86o6zt4UZhUuF3bbH7j/ue//uO/ubdvu/40+eHt280EzzWiZD6jXD' +\
-
-          \     'qigByJjijDyaUxN/WnNPAjyrab0WQeAKVAOqzy/CGAuVwSM9AHZhwSccRxaJIwIDJLfY84' +\
-
-          \     'aVJ5vGcXIHKmIhLCr/Mk5UKSOiMuhs1ij6FkCxIu8JMU9vEj9jJgn0bsmMxcbh9fvH3L1r' +\
-
-          \     '19C0QF8zA6qOzi/1tQTC3XR/IpNaC+iB8lbB8vDoJ44UdDbgosJD/sQvr27c8dms6nH/e/' +\
-
-          \     'TfDnARDBPZluLKd05oewKxOGCwbkBwmspw8TPEzwxcQ2gjqYJLOKdAakgRgYs4DALSb4Yo' +\
-
-          \     'JnE9sITCZl4MofjlLcma3j1y+2AVpsN5BAYV3xDIDynUaUf3i5DXiRTzHYexLMKe5WrGew' +\
-
-          \     '+cttwM48BO/LmFlHdJlyoO8pAif5BA8TPE7wbAIQvMybieYajifZvKg7Dq8Qx+B1jXg80R' +\
-
-          \     'RPt72qIEvS53v6nwjnu4cf9pjmP+z9+Kf35MfH9sYx0/i7lDqgjmJTuqTOnF37O/E8SmE2' +\
-
-          \     'mgfBYw5Umziuof0ClfE8nc5Tdn/8cTfdfjiNZym3ILMIrDvZZdfruYrnBymdrR/3P+z5wy' +\
-
-          \     'ie0Q97B6/Ll0MdXZEEldcpNUAzqBRDo7xCPVWrUs02XPI1PP8zxDH0gZQEAUcgrA4xrFZS' +\
-
-          \     'Ys8DMjs8FCtqReD+jUMn5PiIEzeyeALqkBQiRZIihFTRPwPCI/DTPzyE1RX1M9YH6JVDOz' +\
-
-          \     'w8VCrVz6IJfNEZ4QZGRfyM5cthwYFcESvyM4AXuRXVPU8VqpT3RCLzimEIqDyD1zRDIKoo' +\
-
-          \     'qJIqfrlb7Q6Qu/xsd4zdZdfgkXlkW2c1lnzW2bRZh0mSwvaAyvcytpRFV8wCuGKBeXmT0V' +\
-
-          \     'jKXhDYFzIlRsgK5rVkHf1gIcBnU98BuUN0uweyiB3QPI8/oQORxzNuEc8mNo2cUeV13csj' +\
-
-          \     'mqfJVZcXbBUCn6HrGPhUXnFFojouFXRN/hr3WvNxx+R5yH3Y+9NV46J1VGvcXTQvGq2m1b' +\
-
-          \     'izjszGjx8eKQN4vvPdp6uvrq27Zv3JMpaudiA22/VGa431ZYarKmCaxFDQUiHqiJAUdEmi' +\
-
-          \     'vCHahOq6Ldua/uWGuzsx7zLc3bn9E9Xbf/47VDpHrDCD+u3TRRsUNMR1AVma12UPNvVLhR' +\
-
-          \     'q+L6q7ystk6dlErDpE421R9cCwNMIbqq3wruyA6YlVWVGEz5flg2TyGtH2IzLz0aPAVQF8' +\
-
-          \     '5jvJK7sI6FvWBNfjqeMSXlFlF8xARiYkRdChXnDk6itkXTtOY3mj1+JtvDNaJTJYPAOogG' +\
-
-          \     '4Yvv3vEvm7dxyN3GnsR+ndfBYcxkmFRvf+LI5+/u6o17nryHcNq37Rblrd7z4ebNDZc2cC' +\
-
-          \     '8e+QS+TKMft9fwfo8XXtp8ZTwM1vHgjtbkY9P72b4o8lYAMcU5KOKmMgaP9JIHjH5S7+Dt' +\
-
-          \     'z2Iefm3pDwiIpnqKCYeEQkTdK73OWTuY2In2/xoYgI6yj8Ye8dt4kRu1EVeCw4W2zmgxji' +\
-
-          \     '8p3rz7ZmHjEMQTm2x3j2yMVXgSeKh5m8Mtq/YGI43BLMwaPzAv7H97gdrAFawFeZ0OzZch' +\
-
-          \     'wpmQ2ZvooliGNDM7g5Es2BLOlTAT2sebeGPNhGDrggDjwA0iWcsZL99SMAozD3cxIODnZQ' +\
-
-          \     'hwOWh2QC9f3s06A7ty7o+pkXP3KHh9x377/7xA54IvOjOd2eLdSxDrZ3oA+6X+B9V8hux+' +\
-
-          \     'bbRvFEdgWCSjIN/HT/kVn9LHz8hJltfpvOwCXBPvMT19o+4TAT4zF5HsGxFY31GQkvvJlw' +\
-
-          \     'PAhRri3zogLFsqJQiTcc1eWrVbkqGKpjS7b65bnr6dlwV856epzcJYa6D9IjefVUxOp37L' +\
-
-          \     '5gnmB+glP+DAIHRnKPkhSSWMLlYZBEkIs4dLmEBuBk64T4woxkK65OJU3gPcUACREdylJZ' +\
-
-          \     'JTzRxaphEF13dflL7nWA95ybXUwXU1h80lnIknmc31fYJAFfxRsN0DuHu7x25tJsR/IkmZ' +\
-
-          \     'ddCnw6ss0TYqi8q9qSSgXbIVXxFTLXFDRGIAMn3NTdSmDjJI52HiR98LF4SqP9J272zAUw' +\
-
-          \     'QRSWgg7y8FBhaPcODnBX71mIKNaAB09dtvAOTqYhCfwV3cfHCoaFfe9gp6sWwC8zLE2SFZ' +\
-
-          \     'XYLm8rIpSNXlXmdVuw+aorSOCThGqy/WWGVXvmHa9rILYr6y6RFJ5oVYVXdKpDqBAc3pB0' +\
-
-          \     'laq6KHj0qwzkwbfvCt9mKplRiMqoiC9T/XNkDzawUd7WkhFstf/SOOooHqjR5iUq6bwiVE' +\
-
-          \     'EusmTDeVORRV2yqSeLX6bMkzyqPQpqj+4b4ynEgYidDN08TlL3leOBQDRF1DzCy0YVK3Fd' +\
-
-          \     '5m0iCbzoegIc0B2BSl91l1JE7bsNf1+l8G10O1S+YxFTuii8UO3Vql6lHshHllSRV2QQl+' +\
-
-          \     '0YLk8MaoiioxmC7nx5+ty+Jd2VQrcvWHeFqIdVTw6HGAkJ183vrS7W8Fxelb6yIRnUdlQN' +\
-
-          \     'ZCRq1OYVAw53uutAnLMlWXMdR5JE/asMCa9Bti7jCr/Z4nF3xbUWwOHW+jz+/z1TfKSog5' +\
-
-          \     'd+I6oqjlalCi/aCoRX2ya8jpfMsqjpVVkmslQlX25K2/fmu0xp+8p9l5iu4YiQkHAa4CHf' +\
-
-          \     'iWduwj7tFLA5XIV7XeNxq4aqSirUp7oBDuZ5YDy2THnPIzKkI8g9nv6rVSWPztDALr1D7G' +\
-
-          \     'AiD3dHnSPzotW4u2r3ftxa6uXRrA4gJzM8ySDw4QbPwTbEVyUgT9Co6GoiD8kY/2BbV3hd' +\
-
-          \     '0wivEk8RVEWDRPQFnx+3DYKDVBkNub8U6obzaWyTv2D5NIpfO/XoiiKKMhSgkgFsKJQYUG' +\
-
-          \     'QQUD9VJM2FapSK9lfdMz449xNu9teKeKEKNEqrLvvD+aooga3aBm9TOFDZEkQ5XdY0iXov' +\
-
-          \     '+C608+PVzg9FO79/7f7gWKzFK8Bn35Ah3FH8eLzOF5/4epxfd5MnH4/xrFIECOYqO02msp' +\
-
-          \     'sg64HgZ5+Vr+Zbe2QgKg6kn++yT/M7zPyzbVJ8/31y6Z44IxqSg6efjpmkYlg3e8zZ82/D' +\
-
-          \     'dsY5IxINGSebk/tfcv4pflRgWyDc+haBzbFfWBPGk23bU2SD3eQ7UOqk+d3roxQcsZt8l0' +\
-
-          \     '6DOGMfI3Ip/tShs3tgcp6kQCXsiv1dLzzSKgqpqoKj81RlHzAlCoaKBxHquJpsKBA9jM83' +\
-
-          \     'VJ7nN2R8w6HPPQGD13sTOotokEypU7yByJ7XrUyaSNRFBpEk4uSKuP4sGYDY52TIZqdstp' +\
-
-          \     'hYg+Qv5b01/w8Qd37kxQ87YewJ/dksnrGsvX6/weM/xs7t3dMZHgtgRsYXBdt4M3QHRgrW' +\
-
-          \     'lk/uVabZWkqgi7XEU1jzfsn/AsHrlzacQGCvFLBiEqKzrSXTbIgmkNwFEDRnj0hd3zhsSN' +\
-
-          \     '1DwVWMvVwJSDNs4OFRFiOs8vj5LvThjAtv1W/+VrYD/j77/8r+37L/d6v/VxKUsv/3j+H/' +\
-
-          \     'Mzqc0ST5lXp/P6P/F1t/n/f/iqpW9v+W/b9l/2/Z/1v2/5b9v2X/b9n/W/b/lv2/Zf9v2f' +\
-
-          \     '9b9v+W/b9l/2/Z/1v2/5b9v2X/79f2/87ovU8X7Mvipv/pyWdN/PPY9V/fwi/Y5PHk74Mo' +\
-
-          \     'fvVn/+9A7l/nJPDT7F3ZVVx2FZddxWVXcdlVXHYVl13FZVdx2VVcdhWXXcVlV3HZVVx2FZ' +\
-
-          \     'ddxWVX8f/XruLfoIdYdD1NU2zlK/uE/4HdwZ4merLulB3Ar9kBXDaN/krtWmVvadlb+gft' +\
-
-          \     'Lf2yGzvNcUQqEl4TNHBXWfQgT9squKukUMFwRUkxXqfRbu0dazSVNL7Dqf2yW7bslv3dd8' +\
-
-          \     'v+Xvpkyw7ZskO27JAtO2TLDtlylKMc5ShHOcpRjnKUoxzlKEc5ylGOcpSjHOUoRznKUY5y' +\
-
-          \     'lKMc5ShHOcpRjnKUoxzl+HXG/wJlj+QEAKAAAA=='\
-
-          \     )\
-\n\
+          \ *\n\n__KFP_EMBEDDED_ARCHIVE_B64 = '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'\n\
           \nimport base64 as __kfp_b64\nimport io as __kfp_io\nimport os as __kfp_os\n\
           import sys as __kfp_sys\nimport tarfile as __kfp_tarfile\nimport tempfile\
           \ as __kfp_tempfile\n\n# Extract embedded archive at import time to ensure\
           \ sys.path and globals are set\n__kfp_tmpdir = __kfp_tempfile.TemporaryDirectory()\n\
-          __KFP_EMBEDDED_ASSET_DIR = __kfp_tmpdir.name\ntry:\n\
-          \    __kfp_bytes = __kfp_b64.b64decode(\\n    __KFP_EMBEDDED_ARCHIVE_B64.encode('ascii'))\n\
+          __KFP_EMBEDDED_ASSET_DIR = __kfp_tmpdir.name\ntry:\n    __kfp_bytes = __kfp_b64.b64decode(__KFP_EMBEDDED_ARCHIVE_B64.encode('ascii'))\n\
           \    with __kfp_tarfile.open(fileobj=__kfp_io.BytesIO(__kfp_bytes), mode='r:gz')\
           \ as __kfp_tar:\n        __kfp_tar.extractall(path=__KFP_EMBEDDED_ASSET_DIR)\n\
           except Exception as __kfp_e:\n    raise RuntimeError(f'Failed to extract\
@@ -625,8 +400,7 @@ deploymentSpec:
           ,\n        \"predictor\": f\"{model_name_full}/predictor/predictor.pkl\"\
           ,\n    }\n\n    # clone the predictor to the output artifact path and delete\
           \ unnecessary models\n    predictor_clone = predictor.clone(path=output_path\
-          \ / \"predictor\", return_clone=True, dirs_exist_ok=True)\n\
-          \    predictor_clone.delete_models(\\n        models_to_keep=[model_name])\n\
+          \ / \"predictor\", return_clone=True, dirs_exist_ok=True)\n    predictor_clone.delete_models(models_to_keep=[model_name])\n\
           \n    # refit on training + validation data, optionally with extra training\
           \ data\n    predictor_clone.refit_full(model=model_name, train_data_extra=extra_train_df)\n\
           \n    predictor_clone.set_model_best(model=model_name_full, save_trainer=True)\n\
@@ -642,8 +416,7 @@ deploymentSpec:
           \ matrix for classification problem types\n    if predictor.problem_type\
           \ in {\"binary\", \"multiclass\"}:\n        from autogluon.core.metrics\
           \ import confusion_matrix\n\n        confusion_matrix_res = confusion_matrix(\n\
-          \            solution=test_dataset_df[predictor.label],\n\
-          \            prediction=predictor_clone.predict(\\n                test_dataset_df),\n\
+          \            solution=test_dataset_df[predictor.label],\n            prediction=predictor_clone.predict(test_dataset_df),\n\
           \            output_format=\"pandas_dataframe\",\n        )\n        with\
           \ (output_path / \"metrics\" / \"confusion_matrix.json\").open(\"w\") as\
           \ f:\n            json.dump(confusion_matrix_res.to_dict(), f)\n\n    #\
@@ -699,9 +472,7 @@ deploymentSpec:
           \ (\n        f\"{model_name_full}/notebooks/automl_predictor_notebook.ipynb\"\
           \n    )\n\n    return NamedTuple(\"outputs\", model_name=str)(model_name=model_name_full)\n\
           \n"
-        image: >-
-          registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@
-          sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
+        image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
     exec-automl-data-loader:
       container:
         args:
@@ -724,10 +495,7 @@ deploymentSpec:
 
           printf "%s" "$0" > "$program_path/ephemeral_component.py"
 
-          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main \
-          --component_module_path \
-          "$program_path/ephemeral_component.py" \
-          "$@"
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
 
           '
           - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
@@ -948,9 +716,7 @@ deploymentSpec:
           \ stratify_effective,\n        },\n        sample_row=sample_row,\n    \
           \    models_selection_train_data_path=models_selection_train_data_path,\n\
           \        extra_train_data_path=extra_train_data_path,\n    )\n\n"
-        image: >-
-          registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@
-          sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
+        image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
     exec-leaderboard-evaluation:
       container:
         args:
@@ -973,10 +739,7 @@ deploymentSpec:
 
           printf "%s" "$0" > "$program_path/ephemeral_component.py"
 
-          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main \
-          --component_module_path \
-          "$program_path/ephemeral_component.py" \
-          "$@"
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
 
           '
           - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
@@ -1085,9 +848,7 @@ deploymentSpec:
           ] = leaderboard_df.to_dict()\n    html_artifact.metadata[\"display_name\"\
           ] = \"automl_leaderboard\"\n    return NamedTuple(\"outputs\", best_model=str)(best_model=best_model_name)\n\
           \n"
-        image: >-
-          registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@
-          sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
+        image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
     exec-models-selection:
       container:
         args:
@@ -1112,10 +873,7 @@ deploymentSpec:
 
           printf "%s" "$0" > "$program_path/ephemeral_component.py"
 
-          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main \
-          --component_module_path \
-          "$program_path/ephemeral_component.py" \
-          "$@"
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
 
           '
           - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
@@ -1150,9 +908,8 @@ deploymentSpec:
           \ If train_data or test_data paths cannot be found.\n        ValueError:\
           \ If label_column missing, task_type invalid, top_n not positive, or training\
           \ fails.\n        KeyError: If required columns are missing from the datasets.\n\
-          \n    Example:\n        from kfp import dsl\n\
-          \        from components.training.automl.autogluon_models_selection import (\n\
-          \            models_selection\n        )\n\n        @dsl.pipeline(name=\"\
+          \n    Example:\n        from kfp import dsl\n        from components.training.automl.autogluon_models_selection\
+          \ import (\n            models_selection\n        )\n\n        @dsl.pipeline(name=\"\
           model-selection-pipeline\")\n        def selection_pipeline(train_data_path,\
           \ test_data, workspace_path):\n            \"Select top 3 models from training.\"\
           \n            result = models_selection(\n                label_column=\"\
@@ -1166,37 +923,36 @@ deploymentSpec:
           \        raise TypeError(\"label_column must be a non-empty string.\")\n\
           \    if task_type not in VALID_TASK_TYPES:\n        raise ValueError(f\"\
           task_type must be one of {VALID_TASK_TYPES}; got {task_type!r}.\")\n   \
-          \ if not isinstance(top_n, int) or top_n <= 0 or top_n > TOP_N_MAX:\n  \
-          \      raise TypeError(f\"top_n must be an integer in the range (0, {TOP_N_MAX};\
-          \ got {top_n}.\")\n    if not train_data_path or not isinstance(train_data_path,\
-          \ str) or not train_data_path.strip():\n        raise TypeError(\"train_data_path\
-          \ must be a non-empty string.\")\n    if not workspace_path or not isinstance(workspace_path,\
+          \ if not train_data_path or not isinstance(train_data_path, str) or not\
+          \ train_data_path.strip():\n        raise TypeError(\"train_data_path must\
+          \ be a non-empty string.\")\n    if not workspace_path or not isinstance(workspace_path,\
           \ str) or not workspace_path.strip():\n        raise TypeError(\"workspace_path\
-          \ must be a non-empty string.\")\n\n    import logging\n\n    logger = logging.getLogger(__name__)\n\
-          \n    from pathlib import Path\n\n    import pandas as pd\n    from autogluon.tabular\
-          \ import TabularPredictor\n\n    # Set constants\n    DEFAULT_PRESET = \"\
-          medium_quality\"\n    DEFAULT_TIME_LIMIT = 60 * 60  # 60 * 60 = 3600 seconds\
-          \ = 1 hour\n\n    # Read the data\n    train_data_df = pd.read_csv(train_data_path)\n\
-          \    test_data_df = pd.read_csv(test_data.path)\n\n    eval_metric = \"\
-          r2\" if task_type == \"regression\" else \"accuracy\"\n\n    predictor_path\
-          \ = Path(workspace_path) / \"autogluon_predictor\"\n    predictor = TabularPredictor(\n\
-          \        problem_type=task_type,\n        label=label_column,\n        eval_metric=eval_metric,\n\
-          \        path=predictor_path,\n        verbosity=2,\n    ).fit(\n      \
-          \  train_data=train_data_df,\n        num_stack_levels=3,  # TODO: discuss\
-          \ optimal value\n        num_bag_folds=2,\n        use_bag_holdout=True,\n\
-          \        holdout_frac=0.2,  # 0.2 = 20% of the data is used for validation\n\
-          \        time_limit=DEFAULT_TIME_LIMIT,\n        presets=DEFAULT_PRESET,\n\
-          \    )\n\n    leaderboard = predictor.leaderboard(test_data_df)\n    logger.info(f\"\
-          Leaderboard:\\n\\n {leaderboard.head(top_n).to_string()}\")\n\n    top_n_models\
-          \ = leaderboard.head(top_n)[\"model\"].values.tolist()\n\n    outputs =\
-          \ NamedTuple(\"outputs\", top_models=List[str], eval_metric=str, predictor_path=str,\
-          \ model_config=dict)\n    return outputs(\n        top_models=top_n_models,\n\
+          \ must be a non-empty string.\")\n\n    # the type of top_n is already validated\
+          \ by kfp based on its annotation in component signature\n    if top_n <=\
+          \ 0 or top_n > TOP_N_MAX:\n        raise ValueError(f\"top_n must be an\
+          \ integer in the range (0, {TOP_N_MAX}]; got {top_n}.\")\n\n    import logging\n\
+          \n    logger = logging.getLogger(__name__)\n\n    from pathlib import Path\n\
+          \n    import pandas as pd\n    from autogluon.tabular import TabularPredictor\n\
+          \n    # Set constants\n    DEFAULT_PRESET = \"medium_quality\"\n    DEFAULT_TIME_LIMIT\
+          \ = 60 * 60  # 60 * 60 = 3600 seconds = 1 hour\n\n    # Read the data\n\
+          \    train_data_df = pd.read_csv(train_data_path)\n    test_data_df = pd.read_csv(test_data.path)\n\
+          \n    eval_metric = \"r2\" if task_type == \"regression\" else \"accuracy\"\
+          \n\n    predictor_path = Path(workspace_path) / \"autogluon_predictor\"\n\
+          \    predictor = TabularPredictor(\n        problem_type=task_type,\n  \
+          \      label=label_column,\n        eval_metric=eval_metric,\n        path=predictor_path,\n\
+          \        verbosity=2,\n    ).fit(\n        train_data=train_data_df,\n \
+          \       num_stack_levels=3,  # TODO: discuss optimal value\n        num_bag_folds=2,\n\
+          \        use_bag_holdout=True,\n        holdout_frac=0.2,  # 0.2 = 20% of\
+          \ the data is used for validation\n        time_limit=DEFAULT_TIME_LIMIT,\n\
+          \        presets=DEFAULT_PRESET,\n    )\n\n    leaderboard = predictor.leaderboard(test_data_df)\n\
+          \    logger.info(f\"Leaderboard:\\n\\n {leaderboard.head(top_n).to_string()}\"\
+          )\n\n    top_n_models = leaderboard.head(top_n)[\"model\"].values.tolist()\n\
+          \n    outputs = NamedTuple(\"outputs\", top_models=List[str], eval_metric=str,\
+          \ predictor_path=str, model_config=dict)\n    return outputs(\n        top_models=top_n_models,\n\
           \        eval_metric=str(predictor.eval_metric),\n        predictor_path=str(predictor_path),\n\
           \        model_config={\"preset\": DEFAULT_PRESET, \"eval_metric\": eval_metric,\
           \ \"time_limit\": DEFAULT_TIME_LIMIT},\n    )\n\n"
-        image: >-
-          registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@
-          sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
+        image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
 pipelineInfo:
   description: 'End-to-end AutoGluon tabular training pipeline implementing a two-stage
     approach: first builds and selects top-performing models on sampled data, then

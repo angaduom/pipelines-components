@@ -500,10 +500,10 @@ class TestModelsSelectionUnitTests:
             )
 
     def test_models_selection_rejects_invalid_top_n(self):
-        """Test that TypeError is raised for non-positive top_n."""
+        """Test that ValueError is raised for non-positive top_n."""
         mock_test_data = mock.MagicMock()
         mock_test_data.path = "/tmp/test_data.csv"
-        with pytest.raises(TypeError, match=r"top_n must be an integer in the range \(0, 10.* got 0\."):
+        with pytest.raises(ValueError, match=r"top_n must be an integer in the range \(0, 10\]; got 0\."):
             models_selection.python_func(
                 label_column="target",
                 task_type="regression",
