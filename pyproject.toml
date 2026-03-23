@@ -23,16 +23,23 @@ lint = [
 ]
 test = [
     "docker",
-    "pytest",
-    "pytest-cov",
-    "pytest-timeout",
     "docstring-parser",
     "jinja2",
     "packaging",
-    "pyyaml",
-    "semver",
     "pip",
-    "setuptools"
+    "pyyaml",
+    "pytest",
+    "pytest-cov",
+    "pytest-timeout",
+    "semver",
+    "setuptools",
+]
+# Dependencies for AutoGluon pipeline integration tests (RHOAI + S3 + KFP)
+test_automl = [
+    "kfp-components[test]",
+    "boto3",
+    "kubernetes",
+    "python-dotenv",
 ]
 # Local development (extends test with additional tools)
 dev = ["kfp-components[lint]", "kfp-components[test]"]
