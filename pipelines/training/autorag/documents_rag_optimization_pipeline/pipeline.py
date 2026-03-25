@@ -82,6 +82,7 @@ def documents_rag_optimization_pipeline(
         test_data_path=test_data_key,
     )
     test_data_loader_task.set_caching_options(False)
+    test_data_loader_task.set_cpu_request("2").set_memory_request("8Gi")
 
     documents_discovery_task = documents_discovery(
         input_data_bucket_name=input_data_bucket_name,
@@ -89,12 +90,14 @@ def documents_rag_optimization_pipeline(
         test_data=test_data_loader_task.outputs["test_data"],
     )
     documents_discovery_task.set_caching_options(False)
-    
+    documents_discovery_task.set_cpu_request("2").set_memory_request("8Gi")
+
     text_extraction_task = text_extraction(
         documents_descriptor=documents_discovery_task.outputs["discovered_documents"],
     )
     text_extraction_task.set_caching_options(False)
-    
+    text_extraction_task.set_cpu_request("2").set_memory_request("8Gi")
+
     for task, secret_name in zip(
         [test_data_loader_task, documents_discovery_task, text_extraction_task],
         [test_data_secret_name, input_data_secret_name, input_data_secret_name],
@@ -117,7 +120,8 @@ def documents_rag_optimization_pipeline(
         generation_models=generation_models,
     )
     mps_task.set_caching_options(False)
-    
+    mps_task.set_cpu_request("2").set_memory_request("8Gi")
+
     hpo_task = rag_templates_optimization(
         extracted_text=text_extraction_task.outputs["extracted_text"],
         test_data=test_data_loader_task.outputs["test_data"],
@@ -131,7 +135,8 @@ def documents_rag_optimization_pipeline(
         input_data_key=input_data_key,
     )
     hpo_task.set_caching_options(False)
-    
+    hpo_task.set_cpu_request("2").set_memory_request("8Gi")
+
     use_secret_as_env(
         mps_task,
         llama_stack_secret_name,
@@ -149,9 +154,10 @@ def documents_rag_optimization_pipeline(
         },
     )
 
-    leaderboard_evaluation(
-        rag_patterns=hpo_task.outputs["rag_patterns"]
-    ).set_caching_options(False)
+    leaderboard_evaluation_task = leaderboard_evaluation(rag_patterns=hpo_task.outputs["rag_patterns"])
+    leaderboard_evaluation_task.set_caching_options(False)
+    leaderboard_evaluation_task.set_cpu_request("1").set_memory_request("4Gi")
+
 
 if __name__ == "__main__":
     from kfp.compiler import Compiler
