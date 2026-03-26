@@ -14,7 +14,9 @@ if str(_tests_dir) not in sys.path:
     sys.path.insert(0, str(_tests_dir))
 
 _SESSION_SUMMARY_LOG = _tests_dir / "summary.log"
+_FAILURES_SUMMARY_LOG = _tests_dir / "failures.log"
 _session_start: float | None = None
+_failed_reports: list[tuple[str, str, str]] = []
 
 
 def _all_collected_items_under_this_tests_dir(session) -> bool:
@@ -35,10 +37,23 @@ def pytest_sessionstart(session):
     """Record session start time for pytest_session_summary.log (AutoML tests only)."""
     global _session_start
     _session_start = time.perf_counter()
+    _failed_reports.clear()
+
+
+def pytest_runtest_logreport(report):
+    """Collect failures for a plain-text summary file."""
+    if not report.failed:
+        return
+    if getattr(report, "wasxfail", False):
+        return
+    nodeid = report.nodeid
+    when = report.when
+    details = getattr(report, "longreprtext", "") or str(report.longrepr)
+    _failed_reports.append((nodeid, when, details))
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """Write duration and pass/fail/skip counts when only this AutoML tests/ suite is collected."""
+    """Write session and failure summaries when only this AutoML tests/ suite is collected."""
     if not _all_collected_items_under_this_tests_dir(session):
         return
     reporter = session.config.pluginmanager.get_plugin("terminalreporter")
@@ -69,6 +84,28 @@ def pytest_sessionfinish(session, exitstatus):
         "",
     ]
     _SESSION_SUMMARY_LOG.write_text("\n".join(lines), encoding="utf-8")
+
+    failure_lines = [
+        "AutoML training pipeline test failures",
+        "=================================================================",
+        "",
+    ]
+    if not _failed_reports:
+        failure_lines.append("No failures.")
+        failure_lines.append("")
+    else:
+        for idx, (nodeid, when, details) in enumerate(_failed_reports, start=1):
+            failure_lines.extend(
+                [
+                    f"{idx}. {nodeid}",
+                    f"Phase: {when}",
+                    details,
+                    "",
+                    "-" * 80,
+                    "",
+                ]
+            )
+    _FAILURES_SUMMARY_LOG.write_text("\n".join(failure_lines), encoding="utf-8")
 
 import pytest
 
