@@ -72,3 +72,10 @@ class TestAutogluonTabularTrainingPipelineUnitTests:
             pytest.fail(f"Pipeline compilation or validation failed: {e}")
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+
+    def test_pipeline_default_top_n_is_five(self):
+        """Test that the pipeline default top_n is 5 for production use."""
+        inputs = autogluon_tabular_training_pipeline.component_spec.inputs
+        assert inputs["top_n"].default == 5, (
+            f"Expected default top_n=5 but got {inputs['top_n'].default}"
+        )
