@@ -5,12 +5,70 @@ import json
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 # Ensure this directory is on path so test modules and integration_config can be imported
 _tests_dir = Path(__file__).resolve().parent
 if str(_tests_dir) not in sys.path:
     sys.path.insert(0, str(_tests_dir))
+
+_SESSION_SUMMARY_LOG = _tests_dir / "summary.log"
+_session_start: float | None = None
+
+
+def _all_collected_items_under_this_tests_dir(session) -> bool:
+    """True when every collected test lives under this AutoML tests/ tree (avoids mixed-suite totals)."""
+    items = getattr(session, "items", None) or []
+    if not items:
+        return False
+    root = _tests_dir.resolve()
+    for item in items:
+        p = getattr(item, "path", None)
+        path = Path(p).resolve() if p is not None else Path(item.fspath).resolve()
+        if not path.is_relative_to(root):
+            return False
+    return True
+
+
+def pytest_sessionstart(session):
+    """Record session start time for pytest_session_summary.log (AutoML tests only)."""
+    global _session_start
+    _session_start = time.perf_counter()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Write duration and pass/fail/skip counts when only this AutoML tests/ suite is collected."""
+    if not _all_collected_items_under_this_tests_dir(session):
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is None:
+        return
+    passed = len(reporter.stats.get("passed", []))
+    failed = len(reporter.stats.get("failed", []))
+    skipped = len(reporter.stats.get("skipped", []))
+    errors = len(reporter.stats.get("error", []))
+    duration_sec = None
+    if _session_start is not None:
+        duration_sec = time.perf_counter() - _session_start
+    else:
+        duration_sec = getattr(session, "duration", None)
+
+    lines = [
+        "AutoML training pipeline tests",
+        "=================================================================",
+        (
+            f"Duration (seconds): {duration_sec:.3f}"
+            if duration_sec is not None
+            else "Duration (seconds): n/a"
+        ),
+        f"Passed:  {passed}",
+        f"Failed:  {failed}",
+        f"Skipped: {skipped}",
+        f"Errors:  {errors}",
+        "",
+    ]
+    _SESSION_SUMMARY_LOG.write_text("\n".join(lines), encoding="utf-8")
 
 import pytest
 
