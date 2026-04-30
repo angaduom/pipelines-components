@@ -27,6 +27,7 @@ USER default
 RUN pip install --index-url https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ --no-cache-dir -r /tmp/requirements.txt
 RUN pip install --index-url https://pypi.org/simple --no-cache-dir -r /tmp/requirements-pypi.txt
 RUN pip install --index-url https://pypi.org/simple --no-cache-dir -r /tmp/requirements-pypi-whl.txt
+RUN pip install --index-url https://pypi.org/simple --no-cache-dir "kfp==2.16.0"
 
 # Docling models for offline text extraction. Hermeto: prefetch with generic lockfile (see /tmp/artifacts.lock.yaml)
 # and mount output at ${HERMETO_GENERIC_DEPS}; https://github.com/hermetoproject/hermeto/blob/main/docs/generic.md
