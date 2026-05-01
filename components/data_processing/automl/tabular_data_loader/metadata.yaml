@@ -1,0 +1,10 @@
+---
+name: tabular_data_loader
+stability: alpha  # New component without proven track record
+dependencies:
+  kubeflow:
+    - name: Pipelines
+      version: '>=2.15.2'
+tags:
+  - data-processing
+lastVerified: 2026-04-02T00:00:00Z

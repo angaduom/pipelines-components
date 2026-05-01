@@ -1,0 +1,53 @@
+---
+# This workflow checks if all CI checks have passed and uploads PR context for label updates.
+name: CI Check
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
+
+jobs:
+  check_ci_status:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      checks: read
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Run CI checks
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_ACTION: ${{ github.event.action }}
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # "Agent" is the Copilot code review check
+          python3 .github/scripts/ci_checks/ci_checks.py \
+            --pr-number "$PR_NUMBER" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --event-action "$EVENT_ACTION" \
+            --labels "$PR_LABELS" \
+            --author-association "$AUTHOR_ASSOCIATION" \
+            --author-login "$AUTHOR_LOGIN" \
+            --head-sha "$HEAD_SHA" \
+            --check-name "check_ci_status" \
+            --ignore-checks "Agent" \
+            --delay 5 \
+            --retries 10 \
+            --polling-interval 5 \
+            --output-dir ./pr
+
+      - name: Upload PR artifact
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: pr
+          path: pr/

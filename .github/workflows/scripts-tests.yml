@@ -3,15 +3,7 @@ name: Scripts Unit Tests
 
 on:
   push:
-    branches:
-      - 'main'
-      - 'release-*'
-    tags:
-      - 'v*'
   pull_request:
-    branches:
-      - 'main'
-      - 'release-*'
     paths:
       - '.github/scripts/**'
       - 'scripts/**'
@@ -34,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Setup Python CI
         uses: ./.github/actions/setup-python-ci
@@ -46,7 +38,31 @@ jobs:
         shell: bash
         run: |
           if compgen -G "*/tests" > /dev/null; then
-            uv run pytest */tests/ -v --tb=short
+            uv run pytest */tests/ -v --tb=short -m "not gh_api"
           else
             echo "No */tests directories found under '${{ matrix.scripts-dir }}'; skipping."
           fi
+
+  api-tests:
+    runs-on: ubuntu-24.04
+    name: API tests (.github/scripts)
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Setup Python CI
+        uses: ./.github/actions/setup-python-ci
+        with:
+          python-version: "3.13"
+
+      - name: Run API tests
+        working-directory: .github/scripts
+        shell: bash
+        run: |
+          if compgen -G "*/tests" > /dev/null; then
+            uv run pytest */tests/ -v --tb=short -m gh_api
+          else
+            echo "No */tests directories found; skipping."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

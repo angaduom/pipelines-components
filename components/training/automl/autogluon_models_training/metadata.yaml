@@ -1,0 +1,11 @@
+---
+name: autogluon_models_training
+stability: alpha  # New component without proven track record
+dependencies:
+  kubeflow:
+    - name: Pipelines
+      version: '>=2.15.2'
+tags:
+  - training
+  - automl
+lastVerified: 2026-04-21T12:00:00Z
